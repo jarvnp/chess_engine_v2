@@ -6,9 +6,13 @@ using namespace std;
 
 int main()
 {
-    Board a;
+    string fen;
+    getline(cin,fen);
+    Board a(fen);
     a.printBoard(cout);
     while(1){
+
+        a.searchForMove(4,true);
         string move;
         cin >> move;
         if(move == "q"){

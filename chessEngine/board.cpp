@@ -3,6 +3,33 @@
 
 
 
+ostream& operator<<(ostream& stream, const moveData& move)
+{
+    char fromX = (8-move.fromX)+'0';
+    char fromY = move.fromY+'a';
+    char toX = (8-move.toX)+'0';
+    char toY = move.toY+'a';
+    char promotion = 0;
+    if(move.promotionTo != EMPTY){
+        switch(move.promotionTo){
+        case QUEEN:
+            promotion = 'q';
+            break;
+        case ROOK:
+            promotion = 'r';
+            break;
+        case KNIGHT:
+            promotion = 'n';
+            break;
+        case BISHOP:
+            promotion = 'b';
+            break;
+        }
+    }
+    stream << fromY << fromX << toY << toX << promotion;
+    return stream;
+}
+
 
 
 Board::Board(string fen)
@@ -13,6 +40,7 @@ Board::Board(string fen)
 
 void Board::printBoard(ostream &stream)
 {
+
     stream << castlingIsPossible_[0][0] << " " << castlingIsPossible_[0][1] << " " << castlingIsPossible_[1][0] << " " << castlingIsPossible_[1][1] << "\n";
     stream << "\t";
     for(char i = 'a'; i<'i'; i++){
@@ -32,21 +60,25 @@ void Board::printBoard(ostream &stream)
     }
     stream << endl;
     stream << boardscore_ << " " << evaluateBoard() << "\n";
+
+    vector<moveData> moves;
+    findLegalMoves(moves);
+    for(moveData move : moves){
+        cout << move << "\n";
+    }
 }
 
 bool Board::makeMoveIfAllowed(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, int8_t promotionTo)
 {
-    int8_t color = board_[fromX][fromY].color();
     if(!isAllowedMoveNoCheckTest(fromX, fromY, toX, toY)){
         return false;
     }
-    moveBackupData* moveBackup = makeAMove(fromX, fromY, toX, toY, promotionTo);
+    int8_t color = board_[fromX][fromY].color();
+    moveBackupData moveBackup = makeAMove(fromX, fromY, toX, toY, promotionTo);
     if(isChecked(pieceLocations_[color][KING_INDEX].x(), pieceLocations_[color][KING_INDEX].y(),color)){
         reverseAMove(moveBackup);
-        delete moveBackup;
         return false;
     }
-    delete moveBackup;
     return true;
 }
 
@@ -112,6 +144,61 @@ bool Board::userMakeMoveIfAllowed(string move)
 
 
 
+int16_t Board::searchForMove(int8_t depth, bool isInitialCall)
+{
+    if(boardscore_ != evaluateBoard()){
+        cout << "internal error\n";
+    }
+
+    if(depth == 0){
+        return boardscore_;
+    }
+    vector<moveData> moves;
+    findLegalMoves(moves);
+    int16_t score = WORST_SCORE;
+    if(turn_ == BLACK){
+        score *= -1;
+    }
+    for(moveData move : moves){
+        moveBackupData backup = makeAMove(move.fromX, move.fromY,move.toX,move.toY,move.promotionTo);
+        int16_t temp = searchForMove(depth-1);
+        reverseAMove(backup);
+        if(isBetterScore(temp,score, turn_)){
+            score = temp;
+            //cout << "\t" << move << "\n";
+            if(isInitialCall){
+
+                bestMove_ = move;
+            }
+        }
+    }
+
+    if(isInitialCall){
+        cout <<"Best move: " << bestMove_ << "\n";
+    }
+    return score;
+}
+
+bool Board::isAllowedMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, int8_t promotionTo)
+{
+    if(board_[fromX][fromY].color() != turn_){
+        return false;
+    }
+    if(!isAllowedMoveNoCheckTest(fromX, fromY, toX, toY)){
+        return false;
+    }
+    int8_t color = board_[fromX][fromY].color();
+    moveBackupData moveBackup = makeAMove(fromX, fromY, toX, toY, promotionTo);
+    if(isChecked(pieceLocations_[color][KING_INDEX].x(), pieceLocations_[color][KING_INDEX].y(),color)){
+        reverseAMove(moveBackup);
+        return false;
+    }
+    reverseAMove(moveBackup);
+    return true;
+}
+
+
+
 void Board::fenToBoard(string fen)
 {
     int8_t index = 0;
@@ -154,10 +241,13 @@ void Board::fenToBoard(string fen)
               }
             }
           }
-
         }
       }
-      index += 3; //skipping the part telling who's turn it is
+
+      //whose turn it is
+      index += 1;
+      turn_ = (fen[index] == 'b');
+      index += 2;
 
       //Castling information
 
@@ -351,6 +441,12 @@ bool Board::isAllowedMoveForKing(int8_t fromX, int8_t fromY, int8_t toX, int8_t 
       if( !((abs(fromY-toY) == 2) && (toX == fromX) && (fromX == 7-color*7)) ) {
         return false;       //king must move 2 steps to x direction and kings x-coordinate must be 7 or 0 (depending on color)
       }
+
+      //king can't be in check when castling
+      if(isChecked(fromX,fromY,color)){
+          return false;
+      }
+
       if(toY > fromY){  //Kingside castling
         if(!castlingIsPossible_[color][KINGSIDE_CASTLING]){
             return false;
@@ -362,7 +458,7 @@ bool Board::isAllowedMoveForKing(int8_t fromX, int8_t fromY, int8_t toX, int8_t 
         }
 
         //the positions between king and rook can't be checked
-        //  (the end position also can't be checked but that is maked sure in checkTest-function)
+        //  (the end position also can't be checked but that is maked sure later)
         //  (This is because generally we can do checktest only after the move has actually been made)
         if(isChecked(fromX,5,color) || isChecked(fromX,6,color)){
           return false;
@@ -413,6 +509,7 @@ bool Board::isChecked(int8_t x, int8_t y, int8_t color)
 
     for(int8_t i=0; i<16; i++){
         if(pieceLocations_[!color][i].isNotOnBoard() == false){
+            //cout << "Checktest: " << pieceLocations_[!color][i].x() << " " << pieceLocations_[!color][i].y() << "\n";
             if(isAllowedMoveNoCheckTest(pieceLocations_[!color][i].x(),pieceLocations_[!color][i].y(),x,y)){
                 board_[x][y].setPiece(backUp);
                 return true;
@@ -428,6 +525,12 @@ bool Board::isChecked(int8_t x, int8_t y, int8_t color)
 
 bool Board::isAllowedMoveNoCheckTest(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY)
 {
+    if(max(fromX,fromY)>7 || min(fromX,fromY)<0){
+        return false;
+    }
+    if(max(toX,toY)>7 || min(toX,toY)<0){
+        return false;
+    }
     switch(board_[fromX][fromY].getPieceType()){
         case PAWN:
             return isAllowedMoveForPawn(fromX,fromY,toX,toY);
@@ -448,14 +551,14 @@ bool Board::isAllowedMoveNoCheckTest(int8_t fromX, int8_t fromY, int8_t toX, int
 }
 
 
-moveBackupData* Board::makeAMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, int8_t promotionTo)
+moveBackupData Board::makeAMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, int8_t promotionTo)
 {
-    moveBackupData* moveBackup = new moveBackupData;
-    moveBackup ->fromX = fromX;
-    moveBackup ->fromY = fromY;
-    moveBackup ->toX = toX;
-    moveBackup ->toY = toY;
-    moveBackup->isPromoted = (promotionTo != EMPTY);
+    moveBackupData moveBackup;
+    moveBackup.fromX = fromX;
+    moveBackup.fromY = fromY;
+    moveBackup.toX = toX;
+    moveBackup.toY = toY;
+    moveBackup.isPromoted = (promotionTo != EMPTY);
 
 
     int8_t color = board_[fromX][fromY].color();
@@ -463,11 +566,11 @@ moveBackupData* Board::makeAMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t 
 
 
 
-    moveBackup->castlingInfo = 0;
-    moveBackup->castlingInfo |= castlingIsPossible_[0][0];
-    moveBackup->castlingInfo |= castlingIsPossible_[0][1]<<1;
-    moveBackup->castlingInfo |= castlingIsPossible_[1][0]<<2;
-    moveBackup->castlingInfo |= castlingIsPossible_[1][1]<<3;
+    moveBackup.castlingInfo = 0;
+    moveBackup.castlingInfo |= castlingIsPossible_[0][0];
+    moveBackup.castlingInfo |= castlingIsPossible_[0][1]<<1;
+    moveBackup.castlingInfo |= castlingIsPossible_[1][0]<<2;
+    moveBackup.castlingInfo |= castlingIsPossible_[1][1]<<3;
     //update castling information
     bool castling = updateCastlingInfo(fromX,fromY,toX,toY);
 
@@ -480,17 +583,17 @@ moveBackupData* Board::makeAMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t 
 
     //update board score
     int16_t scoreChange = calculateScoreChange(fromX,fromY, toX, toY, enPassantCaptured, castling, promotionTo);
-    moveBackup->scoreChange = scoreChange;
+    moveBackup.scoreChange = scoreChange;
     boardscore_ -= scoreChange;
 
 
     //make the move
-    moveBackup->capturedPiece = board_[toX][toY];
+    moveBackup.capturedPiece = board_[toX][toY];
     board_[toX][toY] = board_[fromX][fromY];
     board_[fromX][fromY].setPiece(EMPTY);
     pieceLocations_[color][board_[toX][toY].getPieceIndex()] = {toX,toY};
-    if(moveBackup->capturedPiece.getPieceType() != EMPTY){
-        pieceLocations_[!color][moveBackup->capturedPiece.getPieceIndex()].setNotOnBoard();    //piece was captured
+    if(moveBackup.capturedPiece.getPieceType() != EMPTY){
+        pieceLocations_[!color][moveBackup.capturedPiece.getPieceIndex()].setNotOnBoard();    //piece was captured
     }
 
     //remove pawn if enpassant captured
@@ -530,7 +633,7 @@ moveBackupData* Board::makeAMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t 
 
     //remove opponents old en passant
     if(pieceLocations_[!color][EN_PASSANT_INDEX].isNotOnBoard() == false){
-        moveBackup->removedEnPassant = pieceLocations_[!color][EN_PASSANT_INDEX];
+        moveBackup.removedEnPassant = pieceLocations_[!color][EN_PASSANT_INDEX];
 
         board_[pieceLocations_[!color][EN_PASSANT_INDEX].x()][pieceLocations_[!color][16].y()].setPiece(EMPTY);
         pieceLocations_[!color][EN_PASSANT_INDEX].setNotOnBoard();
@@ -541,57 +644,59 @@ moveBackupData* Board::makeAMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t 
         board_[toX][toY].setPiece(promotionTo,color);
     }
 
+    //opponents turn
+    turn_ = !turn_;
 
     return moveBackup;
 }
 
-void Board::reverseAMove(moveBackupData *move)
+void Board::reverseAMove(moveBackupData& move)
 {
-    int8_t color = board_[move->toX][move->toY].color();
+    int8_t color = board_[move.toX][move.toY].color();
 
     //restore promotion
-    if(move->isPromoted){
-        board_[move->toX][move->toY].setPiece(PAWN,color);
+    if(move.isPromoted){
+        board_[move.toX][move.toY].setPiece(PAWN,color);
     }
 
     //remove spawned en_passant pawn
-    if((board_[move->fromX][move->fromY].getPieceType() == PAWN) && (abs(move->toX - move->fromX) == 2)){
+    if((board_[move.toX][move.toY].getPieceType() == PAWN) && (abs(move.toX - move.fromX) == 2)){
         int8_t dir = color*2-1;     //-1 or 1, depending on color
-        board_[move->toX-dir][move->toY].setPiece(EMPTY);   //remove en passant
+        board_[move.toX-dir][move.toY].setPiece(EMPTY);   //remove en passant
         pieceLocations_[color][EN_PASSANT_INDEX].setNotOnBoard();
     }
 
 
     //restore removed (old) enpassant
-    if(move->removedEnPassant.isNotOnBoard() == false){
-        board_[move->removedEnPassant.x()][move->removedEnPassant.y()].setPiece(EN_PASSANT_PAWN,!color);
-        board_[move->removedEnPassant.x()][move->removedEnPassant.y()].setPieceIndex(EN_PASSANT_INDEX);
-        pieceLocations_[!color][EN_PASSANT_INDEX] = move->removedEnPassant;
+    if(move.removedEnPassant.isNotOnBoard() == false){
+        board_[move.removedEnPassant.x()][move.removedEnPassant.y()].setPiece(EN_PASSANT_PAWN,!color);
+        board_[move.removedEnPassant.x()][move.removedEnPassant.y()].setPieceIndex(EN_PASSANT_INDEX);
+        pieceLocations_[!color][EN_PASSANT_INDEX] = move.removedEnPassant;
     }
 
 
     //restore castling info
-    castlingIsPossible_[0][0] = move->castlingInfo&1;
-    castlingIsPossible_[0][1] = (move->castlingInfo>>1)&1;
-    castlingIsPossible_[1][0] = (move->castlingInfo>>2)&1;
-    castlingIsPossible_[1][1] = (move->castlingInfo>>3)&1;
+    castlingIsPossible_[0][0] = move.castlingInfo&1;
+    castlingIsPossible_[0][1] = (move.castlingInfo>>1)&1;
+    castlingIsPossible_[1][0] = (move.castlingInfo>>2)&1;
+    castlingIsPossible_[1][1] = (move.castlingInfo>>3)&1;
 
 
     //restore board score
-    boardscore_ += move->scoreChange;
+    boardscore_ += move.scoreChange;
 
 
     //restore removed pawn in case of en_passant capture
-    if( (board_[move->toX][move->toY].getPieceType() == PAWN) && (move->capturedPiece.getPieceType() == EN_PASSANT_PAWN)){
-        board_[move->fromX][move->toY].setPiece(PAWN,!color);
-        pieceLocations_[!color][board_[move->fromX][move->toY].getPieceIndex()] = {move->fromX,move->toY};  //pieceIndex informations isn't removed in makeAMove-function
+    if( (board_[move.toX][move.toY].getPieceType() == PAWN) && (move.capturedPiece.getPieceType() == EN_PASSANT_PAWN)){
+        board_[move.fromX][move.toY].setPiece(PAWN,!color);
+        pieceLocations_[!color][board_[move.fromX][move.toY].getPieceIndex()] = {move.fromX,move.toY};  //pieceIndex informations isn't removed in makeAMove-function
     }
 
     //restore rook position if castling was done
-    if(board_[move->toX][move->toY].getPieceType() == KING && (abs(move->fromY - move->toY) > 1)){
+    if(board_[move.toX][move.toY].getPieceType() == KING && (abs(move.fromY - move.toY) > 1)){
         int8_t rookFromY;
         int8_t rookToY;
-        if(move->toY > move->fromY){
+        if(move.toY > move.fromY){
             //kingside castling
             rookFromY = 7;
             rookToY = 5;
@@ -601,20 +706,22 @@ void Board::reverseAMove(moveBackupData *move)
             rookFromY = 0;
             rookToY = 3;
         }
-        board_[move->fromX][rookFromY] = board_[move->fromX][rookToY];
-        board_[move->fromX][rookToY].setPiece(EMPTY);
-        pieceLocations_[color][board_[move->fromX][rookFromY].getPieceIndex()] = {move->fromX,rookFromY};
+        board_[move.fromX][rookFromY] = board_[move.fromX][rookToY];
+        board_[move.fromX][rookToY].setPiece(EMPTY);
+        pieceLocations_[color][board_[move.fromX][rookFromY].getPieceIndex()] = {move.fromX,rookFromY};
     }
 
     //undo move
-    board_[move->fromX][move->fromY] = board_[move->toX][move->toY];
-    board_[move->toX][move->toY].setPiece(EMPTY);
-    pieceLocations_[color][board_[move->fromX][move->fromY].getPieceIndex()] = {move->fromX,move->fromY};
-    if(move->capturedPiece.getPieceType() != EMPTY){
-        board_[move->toX][move->toY] = move->capturedPiece;
-        pieceLocations_[!color][move->capturedPiece.getPieceIndex()] = {move->toX,move->toY};
+    board_[move.fromX][move.fromY] = board_[move.toX][move.toY];
+    board_[move.toX][move.toY].setPiece(EMPTY);
+    pieceLocations_[color][board_[move.fromX][move.fromY].getPieceIndex()] = {move.fromX,move.fromY};
+    if(move.capturedPiece.getPieceType() != EMPTY){
+        board_[move.toX][move.toY] = move.capturedPiece;
+        pieceLocations_[!color][move.capturedPiece.getPieceIndex()] = {move.toX,move.toY};
     }
 
+    //opponents turn
+    turn_ = !turn_;
 
 }
 
@@ -753,4 +860,168 @@ int16_t Board::evaluateBoard()
         }
     }
     return tempScore;
+}
+
+void Board::findLegalMoves(vector<moveData> &moves)
+{
+    for(int8_t i=0; i<16; i++){
+        if(pieceLocations_[turn_][i].isNotOnBoard() == false){
+            findLegalMovesForPiece(moves, pieceLocations_[turn_][i].x(), pieceLocations_[turn_][i].y());
+        }
+    }
+
+}
+
+void Board::findLegalMovesForPiece(vector<moveData> &moves, int8_t x, int8_t y)
+{
+    switch(board_[x][y].getPieceType()){
+        case PAWN:
+            findLegalMovesPawn(moves, x,y);
+            break;
+        case ROOK:
+            findLegalMovesRook(moves, x,y);
+            break;
+        case KNIGHT:
+            findLegalMovesKnight(moves, x,y);
+            break;
+        case BISHOP:
+            findLegalMovesBishop(moves, x,y);
+            break;
+        case QUEEN:
+            findLegalMovesQueen(moves, x,y);
+            break;
+        case KING:
+            findLegalMovesKing(moves, x,y);
+            break;
+    }
+}
+
+void Board::findLegalMovesPawn(vector<moveData> &moves, int8_t x, int8_t y)
+{
+    const int8_t dir = ((int8_t)(board_[x][y].color()*2))-1;         //-1 or 1 depending on color
+    const int8_t pawnInitialPosition = 6-board_[x][y].color()*5;      //6 or 1 depending on color
+    const int8_t pawnEndPosition = 0+board_[x][y].color()*7;        //0 or 7
+
+    for(int8_t yMove = -1; yMove != 1; yMove++){
+        if(isAllowedMove(x,y,x+dir,y+yMove)){
+            if(x+dir == pawnEndPosition){
+                moves.push_back({x,y,(int8_t)(x+dir),(int8_t)(y+yMove),QUEEN});
+                moves.push_back({x,y,(int8_t)(x+dir),(int8_t)(y+yMove),ROOK});
+                moves.push_back({x,y,(int8_t)(x+dir),(int8_t)(y+yMove),BISHOP});
+                moves.push_back({x,y,(int8_t)(x+dir),(int8_t)(y+yMove),KNIGHT});
+            }
+            else{
+              moves.push_back({x,y,(int8_t)(x+dir),(int8_t)(y+yMove),EMPTY});
+            }
+        }
+    }
+
+
+    if(x == pawnInitialPosition){
+        if(isAllowedMove(x,y,x+2*dir,y)){
+            moves.push_back({x,y,(int8_t)(x+2*dir),y,EMPTY});
+        }
+    }
+
+}
+
+void Board::findLegalMovesRook(vector<moveData> &moves, int8_t x, int8_t y)
+{
+    int8_t toX, toY;
+    for(int8_t i=0; i<4; i++){
+        int8_t* movingAxis = &toX;
+        if(i >= 2){
+            movingAxis  = &toY;
+        }
+        int8_t dir = (i%2)*2-1; //-1 or 1
+        toX = x;
+        toY = y;
+        for(*movingAxis +=dir; max(toX,toY)<8 && min(toX,toY) > 0; *movingAxis += dir){
+            if(isAllowedMove(x,y,toX,toY)){
+                moves.push_back({x,y,toX,toY,EMPTY});
+            }
+            if( (board_[toX][toY].getPieceType() != EMPTY) && (board_[toX][toY].getPieceType() != EN_PASSANT_PAWN)){
+                break;
+            }
+        }
+    }
+}
+
+void Board::findLegalMovesBishop(vector<moveData> &moves, int8_t x, int8_t y)
+{
+    for(int8_t i=0; i<4; i++){
+
+        int8_t xDir = (i%2)*2-1; //-1 1 -1 1
+        int8_t yDir = (i<2)*2-1; //1 1 -1 -1
+        int8_t toX = x+xDir;
+        int8_t toY = y+yDir;
+        while(max(toX,toY)<8 && min(toX,toY) > 0){
+            if(isAllowedMove(x,y,toX,toY)){
+                moves.push_back({x,y,toX,toY,EMPTY});
+            }
+            if( (board_[toX][toY].getPieceType() != EMPTY) && (board_[toX][toY].getPieceType() != EN_PASSANT_PAWN)){
+                break;
+            }
+            toX+=xDir;
+            toY+=yDir;
+        }
+    }
+}
+
+void Board::findLegalMovesKnight(vector<moveData> &moves, int8_t x, int8_t y)
+{
+    int8_t dX = 2;
+    int8_t dY = 1;
+    for(int8_t i=0; i<8; i++){
+        if(isAllowedMove(x,y,x+dX,y+dY)){
+            moves.push_back({x,y,(int8_t)(x+dX),(int8_t)(y+dY),EMPTY});
+        }
+        dY *= -1;
+        if(i%2){
+            dX *= -1;
+        }
+        if(i == 3){
+            dX = 1;
+            dY = 2;
+        }
+    }
+}
+
+void Board::findLegalMovesQueen(vector<moveData> &moves, int8_t x, int8_t y)
+{
+    findLegalMovesRook(moves,x,y);
+    findLegalMovesBishop(moves,x,y);
+}
+
+void Board::findLegalMovesKing(vector<moveData> &moves, int8_t x, int8_t y)
+{
+    for(int8_t dX=-1; dX <= 1; dX++){
+        for(int8_t dY=-1; dY <= 1; dY++){
+            if((dX == 0) && (dY == 0)){
+                continue;
+            }
+            if(isAllowedMove(x,y,x+dX,y+dY)){
+                moves.push_back({x,y,(int8_t)(x+dX),(int8_t)(y+dY),EMPTY});
+            }
+        }
+    }
+
+    //try castling
+    int8_t castlingMove = 2;
+    for(int8_t i=0; i<2; i++){
+        if(isAllowedMove(x,y,x,y+castlingMove)){
+            moves.push_back({x,y,x,(int8_t)(y+castlingMove),EMPTY});
+        }
+        castlingMove *= -1;
+    }
+}
+
+
+
+bool Board::isBetterScore(int16_t a, int16_t b, int8_t color)
+{
+    if(color == WHITE){
+        return a > b;
+    }
+    return a < b;
 }

@@ -5,7 +5,12 @@
 #include "piece.h"
 #include "boardpoint.h"
 #include <string>
+#include <vector>
+#include <iostream>
 using namespace std;
+
+
+#define WORST_SCORE -30000
 
 
 struct moveBackupData{  //information needed to reverse a move
@@ -19,6 +24,16 @@ struct moveBackupData{  //information needed to reverse a move
     int16_t scoreChange;
     int8_t castlingInfo;
 };
+
+struct moveData{
+    int8_t fromX;
+    int8_t fromY;
+    int8_t toX;
+    int8_t toY;
+    int8_t promotionTo;
+};
+
+
 
 
 const int16_t PIECE_VALUES[6] = {100,320,330,500,900,0}; //pawn,knight,bishop,rook,queen,king
@@ -113,22 +128,25 @@ public:
     bool makeMoveIfAllowed(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, int8_t promotionTo = EMPTY);
     bool userMakeMoveIfAllowed(string move);
 
+    bool isAllowedMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, int8_t promotionTo = EMPTY);
+    int16_t searchForMove(int8_t depth, bool isInitialCall = false);
+
 private:
     Piece board_[8][8]; //8x8 array,   x,y, where x is vertical (1...8) and y is horizontal (a...h)  :)
 
      //an array with information about every pieces' location. For example pieceLocations_[0][0] has information about where one white player's pawn is
-    // the information is in such form that pieceLocations_[0][0]/8 is x coordinate and pieceLocations_[0][0]%8 is y coordinate
     BoardPoint pieceLocations_[2][17];
 
 
     bool castlingIsPossible_[2][2];         // {white queenside, white kingside}{black queenside, black kingside}
 
     int16_t boardscore_;
+    int8_t turn_; //whose turn it is
+    moveData bestMove_;
 
 
     void fenToBoard(string fen);
     void initPieceArray();
-
 
     bool isOwn(int8_t x, int8_t y, int8_t color);
 
@@ -144,9 +162,9 @@ private:
     bool isChecked(int8_t x, int8_t y, int8_t color);
 
     //assumes that the move is legal (but checktest is done after move)
-    moveBackupData* makeAMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY,int8_t promotionTo = EMPTY);
+    moveBackupData makeAMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY,int8_t promotionTo = EMPTY);
 
-    void reverseAMove(moveBackupData* move);
+    void reverseAMove(moveBackupData& move);
 
     bool updateCastlingInfo(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY);
 
@@ -155,6 +173,23 @@ private:
 
     //return board score
     int16_t evaluateBoard();
+
+    //finds all legal moves from a position
+    void findLegalMoves(vector<moveData>& moves);
+
+    void findLegalMovesForPiece(vector<moveData>& moves, int8_t x, int8_t y);
+
+    void findLegalMovesPawn(vector<moveData>& moves, int8_t x, int8_t y);
+    void findLegalMovesRook(vector<moveData>& moves, int8_t x, int8_t y);
+    void findLegalMovesBishop(vector<moveData>& moves, int8_t x, int8_t y);
+    void findLegalMovesKnight(vector<moveData>& moves, int8_t x, int8_t y);
+    void findLegalMovesQueen(vector<moveData>& moves, int8_t x, int8_t y);
+    void findLegalMovesKing(vector<moveData>& moves, int8_t x, int8_t y);
+
+
+
+    //returns true if a is better than b, from perspective of player's color
+    bool isBetterScore(int16_t a, int16_t b, int8_t color);
 
 };
 
