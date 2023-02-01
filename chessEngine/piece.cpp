@@ -46,3 +46,4 @@ int8_t Piece::getPieceType()
 {
     return piece_%DIFFERENCE_BETWEEN_COLORS;
 }
+

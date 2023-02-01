@@ -12,7 +12,7 @@ int main()
     a.printBoard(cout);
     while(1){
 
-        a.searchForMove(4,true);
+        cout << "score: " << a.searchForMove(7,true) << "\n";
         string move;
         cin >> move;
         if(move == "q"){

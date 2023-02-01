@@ -1,7 +1,9 @@
 #ifndef PIECE_H
 #define PIECE_H
 
+
 #include <stdint.h>
+#include <vector>
 
 
 #define EMPTY 0
@@ -25,6 +27,9 @@
 
 
 
+
+
+
 class Piece
 {
 public:
@@ -45,5 +50,7 @@ private:
     int8_t piece_;     //What piece this is (PAWN, KNIGHT etc)
     int8_t pieceIndex_;    //index in pieces-array
 };
+
+
 
 #endif // PIECE_H

@@ -10,7 +10,16 @@
 using namespace std;
 
 
-#define WORST_SCORE -30000
+#define WORST_SCORE_FOR_WHITE -30000
+#define CHECKMATE_SCORE_FOR_WHITE (WORST_SCORE_FOR_WHITE+100)
+
+struct moveData{
+    int8_t fromX;
+    int8_t fromY;
+    int8_t toX;
+    int8_t toY;
+    int8_t promotionTo;
+};
 
 
 struct moveBackupData{  //information needed to reverse a move
@@ -25,13 +34,7 @@ struct moveBackupData{  //information needed to reverse a move
     int8_t castlingInfo;
 };
 
-struct moveData{
-    int8_t fromX;
-    int8_t fromY;
-    int8_t toX;
-    int8_t toY;
-    int8_t promotionTo;
-};
+
 
 
 
@@ -129,7 +132,21 @@ public:
     bool userMakeMoveIfAllowed(string move);
 
     bool isAllowedMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, int8_t promotionTo = EMPTY);
-    int16_t searchForMove(int8_t depth, bool isInitialCall = false);
+
+
+
+    int16_t searchForMove(int8_t depth,int32_t alpha, int32_t beta, bool isInitialCall = false);
+    int16_t searchForMove(int8_t depth,bool isInitialCall = false);
+
+
+    string boardFen();
+
+    //for debugging purposes
+    uint32_t nodes = 0;
+    vector<moveData> movesMade;
+
+
+
 
 private:
     Piece board_[8][8]; //8x8 array,   x,y, where x is vertical (1...8) and y is horizontal (a...h)  :)

@@ -41,7 +41,15 @@ Board::Board(string fen)
 void Board::printBoard(ostream &stream)
 {
 
+    stream << "Moves made: ";
+    for(moveData move: movesMade){
+        stream << move << " ";
+    }
+    cout << "\n";
     stream << castlingIsPossible_[0][0] << " " << castlingIsPossible_[0][1] << " " << castlingIsPossible_[1][0] << " " << castlingIsPossible_[1][1] << "\n";
+    stream << "turn: " << turn_*1 << "\n";
+    stream << boardFen() << "\n";
+
     stream << "\t";
     for(char i = 'a'; i<'i'; i++){
         stream << i << "\t";
@@ -144,30 +152,68 @@ bool Board::userMakeMoveIfAllowed(string move)
 
 
 
-int16_t Board::searchForMove(int8_t depth, bool isInitialCall)
+int16_t Board::searchForMove(int8_t depth,int32_t alpha, int32_t beta, bool isInitialCall)
 {
-    if(boardscore_ != evaluateBoard()){
-        cout << "internal error\n";
+    if(isInitialCall){
+        nodes = 0;
     }
+    nodes++;
+
 
     if(depth == 0){
         return boardscore_;
     }
     vector<moveData> moves;
     findLegalMoves(moves);
-    int16_t score = WORST_SCORE;
+    int16_t score = WORST_SCORE_FOR_WHITE;
     if(turn_ == BLACK){
         score *= -1;
     }
+
+    //if no legal moves were found
+    if(moves.size() == 0){
+        //checkmate
+        if(isChecked(pieceLocations_[turn_][KING_INDEX].x(), pieceLocations_[turn_][KING_INDEX].y(), turn_)){
+            //checkmatescore must be different compared to WORST_SCORE_FOR_WHITE. If it's equal,
+            //then bestmove_ is never saved in situations where checkmate is inevitable, but there is still some legal move to be made
+            //depth is substacted from checkmate score to ensure that if checkmate is possible in for example 2 moves and 3 moves, the program aims for 2 move mate
+            return (turn_ == WHITE) ? (CHECKMATE_SCORE_FOR_WHITE-depth) : -1*(CHECKMATE_SCORE_FOR_WHITE-depth);
+        }
+
+        //if king isn't checked, it's stalemate
+        return 0;
+    }
+
+
+
+
+    if(boardscore_ != evaluateBoard()){
+        cout << "internal error\n";
+        printBoard(cout);
+        while(1);
+    }
+
     for(moveData move : moves){
         moveBackupData backup = makeAMove(move.fromX, move.fromY,move.toX,move.toY,move.promotionTo);
-        int16_t temp = searchForMove(depth-1);
+
+        int16_t temp = searchForMove(depth-1, beta, alpha);
         reverseAMove(backup);
+
+        //Alpha is always the max score that the opponent player is for sure able to achieve.
+        //The opponent player won't allow this position, if better score (worse for the opponent) is achievable.
+        if(isBetterScore(temp,alpha,turn_)){
+            return temp;
+        }
+
+
+        if(isBetterScore(temp,beta, turn_)){
+            beta = temp;
+        }
+
+
         if(isBetterScore(temp,score, turn_)){
             score = temp;
-            //cout << "\t" << move << "\n";
             if(isInitialCall){
-
                 bestMove_ = move;
             }
         }
@@ -175,8 +221,99 @@ int16_t Board::searchForMove(int8_t depth, bool isInitialCall)
 
     if(isInitialCall){
         cout <<"Best move: " << bestMove_ << "\n";
+        cout << "Nodes: " << nodes << "\n";
     }
     return score;
+}
+
+int16_t Board::searchForMove(int8_t depth, bool isInitialCall)
+{
+    int16_t rootValue = WORST_SCORE_FOR_WHITE;
+    if(turn_ == WHITE){
+        rootValue *= -1;
+    }
+    return searchForMove(depth, rootValue,-rootValue,isInitialCall);
+}
+
+string Board::boardFen(){
+  string fen = "";
+  char betweenRanks = '/';
+  for(int8_t i=0; i<8; i++){
+    int8_t emptyCounter = 0;
+    if(i != 0){
+        fen += (char)betweenRanks;
+    }
+    for(int8_t i2=0; i2<8; i2++){
+      if(board_[i][i2].getPieceType() != EMPTY && board_[i][i2].getPieceType()  != EN_PASSANT_PAWN && emptyCounter != 0){
+        fen += '0'+emptyCounter;
+        emptyCounter = 0;
+      }
+
+      if(board_[i][i2].getPieceType() == PAWN){
+     //32 difference between small and capital letters in ascii
+        fen += (char)('p' - 32*(!board_[i][i2].color() ));
+      }
+      else if(board_[i][i2].getPieceType() == ROOK){
+        fen += (char)('r' - 32*(!board_[i][i2].color() ));
+      }
+      else if(board_[i][i2].getPieceType() == BISHOP){
+        fen += (char)('b' - 32*(!board_[i][i2].color() ));
+      }
+      else if(board_[i][i2].getPieceType() == KNIGHT){
+        fen += (char)('n' - 32*(!board_[i][i2].color() ));
+      }
+      else if(board_[i][i2].getPieceType() == QUEEN){
+        fen += (char)('q' - 32*(!board_[i][i2].color() ));
+      }
+      else if(board_[i][i2].getPieceType() == KING){
+        fen += (char)('k' - 32*(!board_[i][i2].color() ));
+      }
+      else{
+        emptyCounter++;
+      }
+    }
+    if(emptyCounter != 0){
+      fen += '0'+emptyCounter;
+    }
+  }
+  if(turn_){
+    fen += " b";
+  }
+  else{
+    fen += " w";
+  }
+  bool castling = 0;
+  fen += " ";
+  if(castlingIsPossible_[0][1]){
+    castling = 1;
+    fen += "K";
+  }
+  if(castlingIsPossible_[0][0]){
+    castling = 1;
+    fen += "Q";
+
+  }
+  if(castlingIsPossible_[1][1]){
+    castling = 1;
+    fen += "k";
+  }
+  if(castlingIsPossible_[1][0]){
+    castling = 1;
+    fen += "q";
+  }
+  if(!castling){
+    fen += "-";
+  }
+  if(pieceLocations_[!turn_][EN_PASSANT_INDEX].isNotOnBoard() == false){
+    fen += " ";
+    fen += (char)('a' + pieceLocations_[!turn_][EN_PASSANT_INDEX].y());
+    fen += '0'+(8-pieceLocations_[!turn_][EN_PASSANT_INDEX].x());
+  }
+  else{
+    fen += " -";
+  }
+  fen += " 0 0";
+  return fen;
 }
 
 bool Board::isAllowedMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, int8_t promotionTo)
@@ -553,6 +690,8 @@ bool Board::isAllowedMoveNoCheckTest(int8_t fromX, int8_t fromY, int8_t toX, int
 
 moveBackupData Board::makeAMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, int8_t promotionTo)
 {
+    movesMade.push_back({fromX,fromY,toX,toY,promotionTo});
+
     moveBackupData moveBackup;
     moveBackup.fromX = fromX;
     moveBackup.fromY = fromY;
@@ -596,10 +735,15 @@ moveBackupData Board::makeAMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t t
         pieceLocations_[!color][moveBackup.capturedPiece.getPieceIndex()].setNotOnBoard();    //piece was captured
     }
 
+
+
+
+
     //remove pawn if enpassant captured
     if(enPassantCaptured){
         board_[fromX][toY].setPiece(EMPTY);  //enemy's pawn eaten at this address ("en passant" -rule)
         pieceLocations_[!color][board_[fromX][toY].getPieceIndex()].setNotOnBoard();
+        moveBackup.capturedPiece.setPieceIndex(board_[fromX][toY].getPieceIndex());     //save the pieceindex of removed pawn
     }
 
     //move rook if castling
@@ -635,8 +779,11 @@ moveBackupData Board::makeAMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t t
     if(pieceLocations_[!color][EN_PASSANT_INDEX].isNotOnBoard() == false){
         moveBackup.removedEnPassant = pieceLocations_[!color][EN_PASSANT_INDEX];
 
-        board_[pieceLocations_[!color][EN_PASSANT_INDEX].x()][pieceLocations_[!color][16].y()].setPiece(EMPTY);
+        board_[pieceLocations_[!color][EN_PASSANT_INDEX].x()][pieceLocations_[!color][EN_PASSANT_INDEX].y()].setPiece(EMPTY);
         pieceLocations_[!color][EN_PASSANT_INDEX].setNotOnBoard();
+    }
+    else{
+        moveBackup.removedEnPassant.setNotOnBoard();
     }
 
     //promotion
@@ -647,11 +794,14 @@ moveBackupData Board::makeAMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t t
     //opponents turn
     turn_ = !turn_;
 
+
     return moveBackup;
 }
 
 void Board::reverseAMove(moveBackupData& move)
 {
+    movesMade.pop_back();
+
     int8_t color = board_[move.toX][move.toY].color();
 
     //restore promotion
@@ -686,10 +836,15 @@ void Board::reverseAMove(moveBackupData& move)
     boardscore_ += move.scoreChange;
 
 
+
+
+    bool enPassantCaptured = false;
     //restore removed pawn in case of en_passant capture
     if( (board_[move.toX][move.toY].getPieceType() == PAWN) && (move.capturedPiece.getPieceType() == EN_PASSANT_PAWN)){
+        enPassantCaptured = true;
         board_[move.fromX][move.toY].setPiece(PAWN,!color);
-        pieceLocations_[!color][board_[move.fromX][move.toY].getPieceIndex()] = {move.fromX,move.toY};  //pieceIndex informations isn't removed in makeAMove-function
+        board_[move.fromX][move.toY].setPieceIndex(move.capturedPiece.getPieceIndex());
+        pieceLocations_[!color][move.capturedPiece.getPieceIndex()] = {move.fromX,move.toY};  //in this case the piece index of the removed pawn is stored here
     }
 
     //restore rook position if castling was done
@@ -711,18 +866,41 @@ void Board::reverseAMove(moveBackupData& move)
         pieceLocations_[color][board_[move.fromX][rookFromY].getPieceIndex()] = {move.fromX,rookFromY};
     }
 
+
     //undo move
     board_[move.fromX][move.fromY] = board_[move.toX][move.toY];
     board_[move.toX][move.toY].setPiece(EMPTY);
     pieceLocations_[color][board_[move.fromX][move.fromY].getPieceIndex()] = {move.fromX,move.fromY};
     if(move.capturedPiece.getPieceType() != EMPTY){
         board_[move.toX][move.toY] = move.capturedPiece;
-        pieceLocations_[!color][move.capturedPiece.getPieceIndex()] = {move.toX,move.toY};
+        if(enPassantCaptured){
+            pieceLocations_[!color][EN_PASSANT_INDEX] = {move.toX,move.toY};
+            board_[move.toX][move.toY].setPieceIndex(EN_PASSANT_INDEX); //the index of the captured pawn is stored in move.capturedPiece
+        }
+        else{
+            pieceLocations_[!color][move.capturedPiece.getPieceIndex()] = {move.toX,move.toY};
+        }
     }
 
     //opponents turn
     turn_ = !turn_;
 
+
+    for(uint32_t i=0; i<8; i++){
+        for(uint32_t j=0; j<8; j++){
+            if(board_[i][j].getPieceType() == EN_PASSANT_PAWN && board_[i][j].getPieceIndex() != EN_PASSANT_INDEX){
+                cout << "wtfreverse?";
+                cout << "Moves made: ";
+                for(moveData move: movesMade){
+                    cout << move << " ";
+                }
+                cout << "\n";
+                cout << "turn: " << turn_*1 << "\n";
+                cout << boardFen() << "\n";
+                while(1){};
+            }
+        }
+    }
 }
 
 //return true if castling is done by this move
@@ -902,7 +1080,7 @@ void Board::findLegalMovesPawn(vector<moveData> &moves, int8_t x, int8_t y)
     const int8_t pawnInitialPosition = 6-board_[x][y].color()*5;      //6 or 1 depending on color
     const int8_t pawnEndPosition = 0+board_[x][y].color()*7;        //0 or 7
 
-    for(int8_t yMove = -1; yMove != 1; yMove++){
+    for(int8_t yMove = -1; yMove != 2; yMove++){
         if(isAllowedMove(x,y,x+dir,y+yMove)){
             if(x+dir == pawnEndPosition){
                 moves.push_back({x,y,(int8_t)(x+dir),(int8_t)(y+yMove),QUEEN});
@@ -936,7 +1114,7 @@ void Board::findLegalMovesRook(vector<moveData> &moves, int8_t x, int8_t y)
         int8_t dir = (i%2)*2-1; //-1 or 1
         toX = x;
         toY = y;
-        for(*movingAxis +=dir; max(toX,toY)<8 && min(toX,toY) > 0; *movingAxis += dir){
+        for(*movingAxis +=dir; max(toX,toY)<8 && min(toX,toY) >= 0; *movingAxis += dir){
             if(isAllowedMove(x,y,toX,toY)){
                 moves.push_back({x,y,toX,toY,EMPTY});
             }
@@ -955,7 +1133,7 @@ void Board::findLegalMovesBishop(vector<moveData> &moves, int8_t x, int8_t y)
         int8_t yDir = (i<2)*2-1; //1 1 -1 -1
         int8_t toX = x+xDir;
         int8_t toY = y+yDir;
-        while(max(toX,toY)<8 && min(toX,toY) > 0){
+        while(max(toX,toY)<8 && min(toX,toY) >= 0){
             if(isAllowedMove(x,y,toX,toY)){
                 moves.push_back({x,y,toX,toY,EMPTY});
             }
