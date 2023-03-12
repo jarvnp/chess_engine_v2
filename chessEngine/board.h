@@ -78,7 +78,6 @@ private:
     bool isAllowedMoveNoCheckTest(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY);
 
     //Checks whether a point on board is checked
-    //Does this by going through every opponent piece and checking if they can move to this position
     //Explanation for parameter "color": if color = WHITE, then we check if any black piece can move to this position
     bool isChecked(int8_t x, int8_t y, int8_t color);
 

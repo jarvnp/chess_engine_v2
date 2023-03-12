@@ -30,7 +30,7 @@ public:
 private:
     int16_t scoreEstimate_;
 
-    //this is used to decide compare-functions output when the score of two moves is equal
+    //this is used to decide compare-function's output when the score of two moves is equal
     uint8_t randomness_ = rand()%256;
 
 };

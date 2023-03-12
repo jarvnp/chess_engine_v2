@@ -549,7 +549,7 @@ bool Board::isOwn(int8_t x, int8_t y, int8_t color)
     return board_[x][y].color() == color;
 }
 
-//checks if a move is legal for rook
+
 bool Board::isAllowedMoveForRook(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY)
 {
     if(isOwn(toX, toY, board_[fromX][fromY].color())){
@@ -699,31 +699,83 @@ bool Board::isAllowedMoveForKing(int8_t fromX, int8_t fromY, int8_t toX, int8_t 
 
 
 
-
-//Checks whether a point on board is checked
-//Does this by going through every opponent piece and checking if they can move to this position
-//Explanation for parameter "color": if color = WHITE, then we check if any black piece can move to this position
-bool Board::isChecked(int8_t x, int8_t y, int8_t color)
-{
-    int8_t backUp = board_[x][y].getPiece();
-
-    //we need to make sure the isAllowedMoveNoCheckTest -function thinks there is some piece in the square we are checking here. That is needed for the PAWN-test.
-    //(Pawns move differently when they capture pieces)
-    board_[x][y].setPiece(PAWN,color);
-
-    for(int8_t i=0; i<16; i++){
-        if(pieceLocations_[!color][i].isNotOnBoard() == false){
-            //cout << "Checktest: " << pieceLocations_[!color][i].x() << " " << pieceLocations_[!color][i].y() << "\n";
-            if(isAllowedMoveNoCheckTest(pieceLocations_[!color][i].x(),pieceLocations_[!color][i].y(),x,y)){
-                board_[x][y].setPiece(backUp);
-                return true;
+bool Board::isChecked(int8_t x, int8_t y, int8_t color){
+    int8_t targetX, targetY;
+    for(int8_t i=0; i<4; i++){
+        int8_t* movingAxis = &targetX;
+        if(i >= 2){
+            movingAxis  = &targetY;
+        }
+        int8_t dir = (i%2)*2-1; //-1 or 1
+        targetX = x;
+        targetY = y;
+        for(*movingAxis +=dir; max(targetX,targetY)<8 && min(targetX,targetY) >= 0; *movingAxis += dir){
+            if( (board_[targetX][targetY].getPieceType() != EMPTY) && (board_[targetX][targetY].getPieceType() != EN_PASSANT_PAWN)){
+                if(!isOwn(targetX, targetY,color)){
+                    if(board_[targetX][targetY].getPieceType() == QUEEN || board_[targetX][targetY].getPieceType() == ROOK){
+                        return true;
+                    }
+                    if(board_[targetX][targetY].getPieceType() == KING && max(abs(targetX-x), abs(targetY-y)) == 1){
+                        return true;
+                    }
+                }
+                break;
             }
         }
     }
 
-    board_[x][y].setPiece(backUp);
+    for(int8_t i=0; i<4; i++){
+
+        int8_t xDir = (i%2)*2-1; //-1 1 -1 1
+        int8_t yDir = (i<2)*2-1; //1 1 -1 -1
+        targetX = x+xDir;
+        targetY = y+yDir;
+        while(max(targetX,targetY)<8 && min(targetX,targetY) >= 0){
+            if( (board_[targetX][targetY].getPieceType() != EMPTY) && (board_[targetX][targetY].getPieceType() != EN_PASSANT_PAWN)){
+                if(!isOwn(targetX, targetY,color)){
+                    if(board_[targetX][targetY].getPieceType() == QUEEN || board_[targetX][targetY].getPieceType() == BISHOP){
+                        return true;
+                    }
+                    if(board_[targetX][targetY].getPieceType() == KING && max(abs(targetX-x), abs(targetY-y)) == 1){
+                        return true;
+                    }
+                    int8_t dir = ((int8_t)((!color)*2))-1;         //-1 or 1 depending on color. The direction of opponent pawn movement
+                    if(board_[targetX][targetY].getPieceType() == PAWN && (targetX+dir == x)){
+                        return true;
+                    }
+                }
+                break;
+            }
+            targetX+=xDir;
+            targetY+=yDir;
+        }
+    }
+
+
+    int8_t dX = 2;
+    int8_t dY = 1;
+    for(int8_t i=0; i<8; i++){
+        if(min(x+dX,y+dY) >= 0 && max(x+dX, y+dY) < 8){
+            if(board_[x+dX][y+dY].getPieceType() == KNIGHT){
+                if(!isOwn(x+dX,y+dY,color)){
+                    return true;
+                }
+            }
+        }
+
+        dY *= -1;
+        if(i%2){
+            dX *= -1;
+        }
+        if(i == 3){
+            dX = 1;
+            dY = 2;
+        }
+    }
+
     return false;
 }
+
 
 
 
@@ -753,7 +805,6 @@ bool Board::isAllowedMoveNoCheckTest(int8_t fromX, int8_t fromY, int8_t toX, int
     }
 
 }
-
 
 moveBackupData Board::makeAMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, int8_t promotionTo)
 {
@@ -1109,12 +1160,6 @@ int16_t Board::evaluateBoard()
 
 void Board::findLegalMovesForIndex(vector<Move> &moves, uint8_t index)
 {
-    /*
-    for(int8_t i=0; i<16; i++){
-        if(pieceLocations_[turn_][i].isNotOnBoard() == false){
-            findLegalMovesForPiece(moves, pieceLocations_[turn_][i].x(), pieceLocations_[turn_][i].y());
-        }
-    }*/
     findLegalMovesForPiece(moves, pieceLocations_[turn_][index].x(), pieceLocations_[turn_][index].y());
 }
 

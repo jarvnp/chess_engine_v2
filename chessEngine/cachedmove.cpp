@@ -3,7 +3,6 @@
 CachedMove::CachedMove()
 {
 
-
 }
 
 CachedMove::CachedMove(Move move, int16_t scoreEstimate):
