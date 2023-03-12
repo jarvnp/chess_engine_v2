@@ -141,7 +141,8 @@ public:
     uint32_t nodes = 0;
     vector<Move> movesMade;
 
-    Move bestMove_;
+    uint64_t time1 = 0;
+    uint64_t time2 = 0;
 
 
 private:
@@ -188,7 +189,7 @@ private:
     int16_t evaluateBoard();
 
     //finds all legal moves from a position
-    void findLegalMoves(vector<Move>& moves);
+    void findLegalMovesForIndex(vector<Move>& moves, uint8_t index);
 
     void findLegalMovesForPiece(vector<Move>& moves, int8_t x, int8_t y);
 

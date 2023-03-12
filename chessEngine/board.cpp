@@ -1,6 +1,8 @@
 #include "board.h"
 #include <iostream>
-
+#include <chrono>
+#include <algorithm>
+#include <random>
 
 
 ostream& operator<<(ostream& stream, const Move& move)
@@ -70,10 +72,10 @@ void Board::printBoard(ostream &stream)
     stream << boardscore_ << " " << evaluateBoard() << "\n";
 
     vector<Move> moves;
-    findLegalMoves(moves);
+    /*findLegalMoves(moves);
     for(Move move : moves){
         cout << move << "\n";
-    }
+    }*/
 }
 
 bool Board::makeMoveIfAllowed(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, int8_t promotionTo)
@@ -160,11 +162,87 @@ int16_t Board::searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPos
         return boardscore_;
     }
 
-    if(! (cache->isInitialized())){
-        vector<Move> moves;
-        findLegalMoves(moves);
-        cache->initWithMoves(moves,turn_);
+    if(!cache->isInitialized()){
+        cache->initColor(turn_);
     }
+
+
+
+    //for debugging
+    /*if(boardscore_ != evaluateBoard()){
+        cout << "internal error\n";
+        printBoard(cout);
+        while(1);
+    }*/
+
+
+    int16_t bestScore = WORST_SCORE_FOR_WHITE;
+    if(turn_ == BLACK){
+        bestScore *= -1;
+    }
+
+
+    Cache::size_type index = 0;
+    uint8_t indeces[] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
+    shuffle(indeces, indeces+16,std::default_random_engine(cache->seed_));
+
+    do{
+
+        if( (!cache->isAllMovesFetched()) && (index >= cache->moves_.size())){
+            vector<Move> moves;
+            findLegalMovesForIndex(moves, indeces[cache->fetchedLegalMovesIndex_]);
+            cache->fetchedLegalMovesIndex_++;
+            for(auto move : moves){
+                int16_t scoreEstimate = WORST_SCORE_FOR_WHITE;
+                if(turn_ == BLACK){
+                    scoreEstimate *= -1;
+                }
+                cache->moves_.push_back(CachedMove(move,scoreEstimate));
+            }
+        }
+
+        for(; index < cache->moves_.size(); index++){
+
+
+
+            moveBackupData backup = makeAMove(
+                        cache->moves_[index].move_.fromX, cache->moves_[index].move_.fromY,
+                        cache->moves_[index].move_.toX,cache->moves_[index].move_.toY,cache->moves_[index].move_.promotionTo);
+            if(cache->moves_[index].nextCache_ == nullptr){
+                cache->moves_[index].nextCache_ = new CachedPosition();
+            }
+            int16_t temp = searchForMove(depth-1, beta, alpha, cache->moves_[index].nextCache_);
+            reverseAMove(backup);
+
+           cache->moves_[index].setScore(temp);
+
+            if(isBetterScore(temp,bestScore,turn_)){
+                bestScore = temp;
+            }
+            //Alpha is always the max score that the opponent player is for sure able to achieve.
+            //The opponent player won't allow this position, if better score (worse for the opponent) is achievable.
+            if(isBetterScore(temp,alpha,turn_)){
+                cache->refreshOrder();
+                if(temp == alpha){
+                    if(turn_ == WHITE){
+                        return temp+1;
+                    }
+                    return temp-1;
+                }
+                return temp;
+            }
+
+
+            if(!isBetterScore(beta,temp, turn_)){
+                beta = temp;
+            }
+
+
+        }
+
+
+
+    }while(cache->fetchedLegalMovesIndex_ < 16);
 
     //if no legal moves were found
     if(cache->isEmpty()){
@@ -180,62 +258,16 @@ int16_t Board::searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPos
         //if king isn't checked, it's stalemate
         return 0;
     }
-
-    //for debugging
-    /*if(boardscore_ != evaluateBoard()){
-        cout << "internal error\n";
-        printBoard(cout);
-        while(1);
-    }*/
-
-    vector<int16_t> updatedScores;
-    vector<Cache::iterator> toBeUpdatedIterators;
-    int16_t bestScore = WORST_SCORE_FOR_WHITE;
-    if(turn_ == BLACK){
-        bestScore *= -1;
-    }
-
-
-    for(Cache::iterator it = cache->getBestMoveIt(); !cache->isEndIt(it); cache->advanceIt(it)){
-        moveBackupData backup = makeAMove(it->move_.fromX, it->move_.fromY,it->move_.toX,it->move_.toY,it->move_.promotionTo);
-        if(it->nextCache_ == nullptr){
-            it->nextCache_ = new CachedPosition();
-        }
-        int16_t temp = searchForMove(depth-1, beta, alpha, it->nextCache_);
-        reverseAMove(backup);
-
-        updatedScores.push_back(temp);
-        toBeUpdatedIterators.push_back(it);
-
-        if(isBetterScore(temp,bestScore,turn_)){
-            bestScore = temp;
-        }
-        //Alpha is always the max score that the opponent player is for sure able to achieve.
-        //The opponent player won't allow this position, if better score (worse for the opponent) is achievable.
-        if(isBetterScore(temp,alpha,turn_)){
-            cache->updateScoreEstimates(updatedScores, toBeUpdatedIterators);
-            if(temp == alpha){
-                if(turn_ == WHITE){
-                    return temp+1;
-                }
-                return temp-1;
-            }
-            return temp;
-        }
-
-
-        if(!isBetterScore(beta,temp, turn_)){
-            beta = temp;
-        }
-
-
-    }
-    cache->updateScoreEstimates(updatedScores, toBeUpdatedIterators);
+    cache->refreshOrder();
     return bestScore;
 }
 
 void Board::searchForMove(int8_t depth)
 {
+    auto start = std::chrono::high_resolution_clock::now();
+
+
+
     nodes = 0;
     int16_t rootValue = WORST_SCORE_FOR_WHITE;
     if(turn_ == WHITE){
@@ -245,17 +277,21 @@ void Board::searchForMove(int8_t depth)
     for(int8_t i=1; i <= depth; i++){
         searchForMove(i, rootValue,-rootValue, &root);
 
-        cout << "depth: " << i*1 << "\n";
-        for(auto pos = &root; pos != nullptr && !pos->isEmpty(); pos = pos->getBestMoveIt()->nextCache_){
-            cout << pos->getBestMoveIt()->move_ << "\t" << pos->getBestMoveIt()->getScore() << "\n";
-            for(auto it = pos->getBestMoveIt(); !pos->isEndIt(it); pos->advanceIt(it)){
-                cout << "\t" << it->move_ << " " << it->getScore() << "\n";
+        cout << "depth: " << i*1 << " nodes: " << nodes <<  "\n";
+        for(auto pos = &root; pos != nullptr && !pos->isEmpty(); pos = pos->moves_[0].nextCache_){
+            cout << pos->moves_[0].move_ << "\t" << pos->moves_[0].getScore() << "\n";
+            for(auto move : pos->moves_){
+                cout << "\t" << move.move_ << " " << move.getScore() << "\n";
             }
         }
         cout << "********\n";
     }
+    auto elapsed = std::chrono::high_resolution_clock::now() - start;
+    uint32_t micros = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
     cout << "nodes: " << nodes << "\n";
-    cout << "best move: " << root.getBestMoveIt()->move_ << "\n";
+    cout << "best move: " << root.moves_[0].move_ << "\n";
+
+    cout << "nodes/sec: " << 1000000.0*(float)nodes/(float)micros << "\n";
 
 }
 
@@ -342,6 +378,8 @@ string Board::boardFen(){
 
 bool Board::isAllowedMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, int8_t promotionTo)
 {
+
+
     if(board_[fromX][fromY].color() != turn_){
         return false;
     }
@@ -349,6 +387,7 @@ bool Board::isAllowedMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, in
         return false;
     }
     int8_t color = board_[fromX][fromY].color();
+
     moveBackupData moveBackup = makeAMove(fromX, fromY, toX, toY, promotionTo);
     if(isChecked(pieceLocations_[color][KING_INDEX].x(), pieceLocations_[color][KING_INDEX].y(),color)){
         reverseAMove(moveBackup);
@@ -511,6 +550,9 @@ bool Board::isOwn(int8_t x, int8_t y, int8_t color)
 //checks if a move is legal for rook
 bool Board::isAllowedMoveForRook(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY)
 {
+    if(isOwn(toX, toY, board_[fromX][fromY].color())){
+      return false;
+    }
     if(toX == fromX){
        int8_t dir = ((fromY < toY)*2)-1;
        for(int8_t i=fromY+dir; i != toY; i += dir){
@@ -529,10 +571,7 @@ bool Board::isAllowedMoveForRook(int8_t fromX, int8_t fromY, int8_t toX, int8_t 
      }
      else{
        return false;
-     }
-     if(isOwn(toX, toY, board_[fromX][fromY].color())){
-       return false;
-     }
+     } 
      return true;
 }
 
@@ -541,15 +580,15 @@ bool Board::isAllowedMoveForBishop(int8_t fromX, int8_t fromY, int8_t toX, int8_
     if( abs(fromX-toX) != abs(fromY-toY)){
         return false;
     }
+    if(isOwn(toX, toY, board_[fromX][fromY].color())){
+        return false;
+    }
     int8_t xDir = ((fromX < toX)*2)-1;
     int8_t yDir = ((fromY < toY)*2)-1;
     for(int8_t i=1; fromX+xDir*i != toX; i++){
         if((board_[fromX+xDir*i][fromY+yDir*i].getPieceType() != EMPTY) && (board_[fromX+xDir*i][fromY+yDir*i].getPieceType() != (EN_PASSANT_PAWN))){
           return false;
         }
-    }
-    if(isOwn(toX, toY, board_[fromX][fromY].color())){
-        return false;
     }
     return true;
 }
@@ -603,10 +642,7 @@ bool Board::isAllowedMoveForKing(int8_t fromX, int8_t fromY, int8_t toX, int8_t 
         return false;       //king must move 2 steps to x direction and kings x-coordinate must be 7 or 0 (depending on color)
       }
 
-      //king can't be in check when castling
-      if(isChecked(fromX,fromY,color)){
-          return false;
-      }
+
 
       if(toY > fromY){  //Kingside castling
         if(!castlingIsPossible_[color][KINGSIDE_CASTLING]){
@@ -642,6 +678,11 @@ bool Board::isAllowedMoveForKing(int8_t fromX, int8_t fromY, int8_t toX, int8_t 
         if(isChecked(fromX,1,color) || isChecked(fromX,2,color) || isChecked(fromX,3,color)){
           return false;
         }
+      }
+
+      //king can't be in check when castling
+      if(isChecked(fromX,fromY,color)){
+          return false;
       }
       return true;
     }
@@ -1064,14 +1105,15 @@ int16_t Board::evaluateBoard()
     return tempScore;
 }
 
-void Board::findLegalMoves(vector<Move> &moves)
+void Board::findLegalMovesForIndex(vector<Move> &moves, uint8_t index)
 {
+    /*
     for(int8_t i=0; i<16; i++){
         if(pieceLocations_[turn_][i].isNotOnBoard() == false){
             findLegalMovesForPiece(moves, pieceLocations_[turn_][i].x(), pieceLocations_[turn_][i].y());
         }
-    }
-
+    }*/
+    findLegalMovesForPiece(moves, pieceLocations_[turn_][index].x(), pieceLocations_[turn_][index].y());
 }
 
 void Board::findLegalMovesForPiece(vector<Move> &moves, int8_t x, int8_t y)

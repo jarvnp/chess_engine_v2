@@ -5,8 +5,9 @@
 #include "move.h"
 #include <set>
 #include <vector>
+#include <time.h>
 
-typedef std::multiset<CachedMove> Cache;
+typedef std::vector<CachedMove> Cache;
 
 
 class CachedPosition
@@ -16,29 +17,27 @@ public:
 
     ~CachedPosition();
 
-    //return iterator to begin or end of Cache, depenging on whose turn it is
-    Cache::iterator getBestMoveIt() const;
+    //return pointer to first element of moves_ (or nullptr if moves_ is empty)
+    const CachedMove* getBestMovePtr() const;
 
-    //either ++it or --it, depending on color
-    void advanceIt(Cache::iterator& it) const;
-
-    //checks if it is valid (points to an object of cache)
-    bool isEndIt(const Cache::iterator& it) const;
-
-    //add moves to cache. The default value for score_estimate depends on color
-    void initWithMoves(std::vector<Move>& moves, bool color);
-
-    //update elements of cache pointed by the iterators with elements in the "moves" vector
-    void updateScoreEstimates(std::vector<int16_t>& scores, std::vector<Cache::iterator>& iterators);
+    //returns true if all legal moves from this position are fetched
+    bool isAllMovesFetched();
 
     bool isInitialized() const;
 
-    bool isEmpty();
+    bool isEmpty()const;
 
+    void refreshOrder();
 
+    void initColor(bool color);
+
+    uint8_t fetchedLegalMovesIndex_ = 0;
+    uint32_t seed_ = time(NULL);
+
+    Cache moves_;
 
 private:
-    Cache moves_;
+
     bool isInitialized_ = false;
     bool color_;
 
