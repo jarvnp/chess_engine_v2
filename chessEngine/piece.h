@@ -22,8 +22,7 @@
 #define EN_PASSANT_INDEX 16
 
 
-#define WHITE 0
-#define BLACK 1
+
 
 
 

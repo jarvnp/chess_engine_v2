@@ -1,29 +1,29 @@
 #include "board.h"
 #include <iostream>
+#include <time.h>
 
 
 using namespace std;
 
 int main()
 {
+    srand(time(NULL));
     string fen;
     getline(cin,fen);
     Board a(fen);
     a.printBoard(cout);
     while(1){
 
-        cout << "score: " << a.searchForMove(7,true) << "\n";
+        a.searchForMove(5);
         string move;
         cin >> move;
         if(move == "q"){
             break;
         }
-        if(!a.userMakeMoveIfAllowed(move)){
+        while(!a.userMakeMoveIfAllowed(move)){
             cout << "illegal move" << endl;
         }
-        else{
-            a.printBoard(cout);
-        }
+        a.printBoard(cout);
     }
     return 0;
 }

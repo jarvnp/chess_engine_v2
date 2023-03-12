@@ -1,0 +1,13 @@
+#ifndef CONSTANTS_H
+#define CONSTANTS_H
+
+#define WHITE 0
+#define BLACK 1
+
+#define WORST_SCORE_FOR_WHITE -30000
+#define CHECKMATE_SCORE_FOR_WHITE (WORST_SCORE_FOR_WHITE+100)
+
+
+#endif // CONSTANTS_H
+
+

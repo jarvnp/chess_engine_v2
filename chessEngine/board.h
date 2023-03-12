@@ -4,22 +4,18 @@
 
 #include "piece.h"
 #include "boardpoint.h"
+#include "cachedposition.h"
+#include "move.h"
+#include "constants.h"
 #include <string>
 #include <vector>
 #include <iostream>
 using namespace std;
 
 
-#define WORST_SCORE_FOR_WHITE -30000
-#define CHECKMATE_SCORE_FOR_WHITE (WORST_SCORE_FOR_WHITE+100)
 
-struct moveData{
-    int8_t fromX;
-    int8_t fromY;
-    int8_t toX;
-    int8_t toY;
-    int8_t promotionTo;
-};
+
+
 
 
 struct moveBackupData{  //information needed to reverse a move
@@ -135,17 +131,17 @@ public:
 
 
 
-    int16_t searchForMove(int8_t depth,int32_t alpha, int32_t beta, bool isInitialCall = false);
-    int16_t searchForMove(int8_t depth,bool isInitialCall = false);
+    int16_t searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPosition* cache);
+    void searchForMove(int8_t depth);
 
 
     string boardFen();
 
     //for debugging purposes
     uint32_t nodes = 0;
-    vector<moveData> movesMade;
+    vector<Move> movesMade;
 
-
+    Move bestMove_;
 
 
 private:
@@ -159,7 +155,7 @@ private:
 
     int16_t boardscore_;
     int8_t turn_; //whose turn it is
-    moveData bestMove_;
+
 
 
     void fenToBoard(string fen);
@@ -192,16 +188,16 @@ private:
     int16_t evaluateBoard();
 
     //finds all legal moves from a position
-    void findLegalMoves(vector<moveData>& moves);
+    void findLegalMoves(vector<Move>& moves);
 
-    void findLegalMovesForPiece(vector<moveData>& moves, int8_t x, int8_t y);
+    void findLegalMovesForPiece(vector<Move>& moves, int8_t x, int8_t y);
 
-    void findLegalMovesPawn(vector<moveData>& moves, int8_t x, int8_t y);
-    void findLegalMovesRook(vector<moveData>& moves, int8_t x, int8_t y);
-    void findLegalMovesBishop(vector<moveData>& moves, int8_t x, int8_t y);
-    void findLegalMovesKnight(vector<moveData>& moves, int8_t x, int8_t y);
-    void findLegalMovesQueen(vector<moveData>& moves, int8_t x, int8_t y);
-    void findLegalMovesKing(vector<moveData>& moves, int8_t x, int8_t y);
+    void findLegalMovesPawn(vector<Move>& moves, int8_t x, int8_t y);
+    void findLegalMovesRook(vector<Move>& moves, int8_t x, int8_t y);
+    void findLegalMovesBishop(vector<Move>& moves, int8_t x, int8_t y);
+    void findLegalMovesKnight(vector<Move>& moves, int8_t x, int8_t y);
+    void findLegalMovesQueen(vector<Move>& moves, int8_t x, int8_t y);
+    void findLegalMovesKing(vector<Move>& moves, int8_t x, int8_t y);
 
 
 
