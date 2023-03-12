@@ -2,11 +2,11 @@
 #define CACHEDPOSITION_H
 
 #include "cachedmove.h"
-#include "move.h"
 #include <set>
 #include <vector>
 #include <time.h>
 
+//where we store the moves for each position
 typedef std::vector<CachedMove> Cache;
 
 
@@ -27,11 +27,15 @@ public:
 
     bool isEmpty()const;
 
+    //Sorts the Cache-vector (ascending or decending, depending on color_)
     void refreshOrder();
 
     void initColor(bool color);
 
+    //how many pieces' legal moves have been fetched for this position
     uint8_t fetchedLegalMovesIndex_ = 0;
+
+    //Legal moves are fethed in random order, determined by this seed
     uint32_t seed_ = time(NULL);
 
     Cache moves_;

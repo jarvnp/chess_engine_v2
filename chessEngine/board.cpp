@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <random>
 
-
+//operator for printing moves
 ostream& operator<<(ostream& stream, const Move& move)
 {
     char fromX = (8-move.fromX)+'0';
@@ -72,10 +72,6 @@ void Board::printBoard(ostream &stream)
     stream << boardscore_ << " " << evaluateBoard() << "\n";
 
     vector<Move> moves;
-    /*findLegalMoves(moves);
-    for(Move move : moves){
-        cout << move << "\n";
-    }*/
 }
 
 bool Board::makeMoveIfAllowed(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, int8_t promotionTo)
@@ -216,13 +212,19 @@ int16_t Board::searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPos
 
            cache->moves_[index].setScore(temp);
 
-            if(isBetterScore(temp,bestScore,turn_)){
+            if(isBetterOrEqScore(temp,bestScore,turn_)){
                 bestScore = temp;
             }
             //Alpha is always the max score that the opponent player is for sure able to achieve.
             //The opponent player won't allow this position, if better score (worse for the opponent) is achievable.
-            if(isBetterScore(temp,alpha,turn_)){
+            if(isBetterOrEqScore(temp,alpha,turn_)){
                 cache->refreshOrder();
+
+                //We have found a move whose score is equal to the score that the opponent player is guaranteed to get.
+                //We don't need to continue searching for moves, since the score can get worse, (for opponent), in which case the opponent won't allow this position to happen.
+                //However we cannot return this value, because then earlier stages of the search tree won't be able to differentiate between this position and
+                // the actual position, where alpha is guaranteed for the opponent.
+                //We add or substract 1 from the score, to make it a bit worse (for the opponent)
                 if(temp == alpha){
                     if(turn_ == WHITE){
                         return temp+1;
@@ -233,7 +235,7 @@ int16_t Board::searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPos
             }
 
 
-            if(!isBetterScore(beta,temp, turn_)){
+            if(!isBetterOrEqScore(beta,temp, turn_)){
                 beta = temp;
             }
 
@@ -250,7 +252,7 @@ int16_t Board::searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPos
         //checkmate
         if(isChecked(pieceLocations_[turn_][KING_INDEX].x(), pieceLocations_[turn_][KING_INDEX].y(), turn_)){
             //checkmatescore must be different compared to WORST_SCORE_FOR_WHITE. If it's equal,
-            //then bestmove_ is never saved in situations where checkmate is inevitable, but there is still some legal move to be made
+            //checkmate is not recognized properly in situations where checkmate is inevitable, but there is still some legal move to be made
             //depth is substacted from checkmate score to ensure that if checkmate is possible in for example 2 moves and 3 moves, the program aims for 2 move mate
             return (turn_ == WHITE) ? (CHECKMATE_SCORE_FOR_WHITE-depth) : -1*(CHECKMATE_SCORE_FOR_WHITE-depth);
         }
@@ -968,7 +970,7 @@ void Board::reverseAMove(moveBackupData& move)
     }
 }
 
-//return true if castling is done by this move
+
 bool Board::updateCastlingInfo(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY)
 {
     int8_t color = board_[fromX][fromY].color();
@@ -1262,7 +1264,7 @@ void Board::findLegalMovesKing(vector<Move> &moves, int8_t x, int8_t y)
 
 
 
-bool Board::isBetterScore(int16_t a, int16_t b, int8_t color)
+bool Board::isBetterOrEqScore(int16_t a, int16_t b, int8_t color)
 {
     if(color == WHITE){
         return a >= b;

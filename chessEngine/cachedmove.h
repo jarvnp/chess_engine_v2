@@ -14,12 +14,14 @@ class CachedMove
 public:
     CachedMove();
     CachedMove(Move move, int16_t scoreEstimate);
-    Move move_;
 
-    uint8_t randomness_ = rand()%256;
-
+    //set scoreEstimate for this move
     void setScore(int16_t scoreEstimate);
+
+    //get scoreEstimage for this move
     int16_t getScore()const;
+
+    Move move_;
 
     mutable CachedPosition* nextCache_ = nullptr;
 
@@ -27,6 +29,9 @@ public:
 
 private:
     int16_t scoreEstimate_;
+
+    //this is used to decide compare-functions output when the score of two moves is equal
+    uint8_t randomness_ = rand()%256;
 
 };
 
