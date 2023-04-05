@@ -29,7 +29,10 @@ ostream& operator<<(ostream& stream, const Move& move)
             break;
         }
     }
-    stream << fromY << fromX << toY << toX << promotion;
+    stream << fromY << fromX << toY << toX;
+    if(promotion != 0){
+      stream << promotion;
+    }
     return stream;
 }
 
@@ -235,7 +238,6 @@ void Board::searchForMove(uint32_t maxTimeSeconds)
         rootValue *= -1;
     }
     CachedPosition root = CachedPosition();
-    cout << std::difftime(time(nullptr), endTime) << "\n";
     Move bestMove;
     for(int8_t i=1; std::difftime(time(nullptr),endTime) <= 0; i++){
         if(root.getBestMovePtr() != nullptr){
@@ -243,22 +245,14 @@ void Board::searchForMove(uint32_t maxTimeSeconds)
         }
         searchForMove(i, rootValue,-rootValue, &root, endTime);
 
-        cout << "depth: " << i*1 << " nodes: " << nodes <<  "\n";
-/*        for(auto pos = &root; pos != nullptr && !pos->isEmpty(); pos = pos->moves_[0].nextCache_){
-            cout << pos->moves_[0].move_ << "\t" << pos->moves_[0].getScore() << "\n";
-            for(auto move : pos->moves_){
-                cout << "\t" << move.move_ << " " << move.getScore() << "\n";
-            }
-        }
-        cout << "********\n";*/
+
 
     }
     auto elapsed = std::chrono::high_resolution_clock::now() - start;
     uint32_t micros = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
-    cout << "nodes: " << nodes << "\n";
-    cout << "best move: " << bestMove << "\n";
 
-    cout << "nodes/sec: " << 1000000.0*(float)nodes/(float)micros << "\n";
+    cout << bestMove;
+
 
 }
 
