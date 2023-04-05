@@ -26,7 +26,7 @@ public:
     bool makeMoveIfAllowed(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, int8_t promotionTo = EMPTY);
 
     //convert string move to movedata and make move if allowed
-    bool userMakeMoveIfAllowed(string move);
+    bool userMakeMoveIfAllowed(string moveStr);
 
     //check if a move is allowed
     bool isAllowedMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, int8_t promotionTo = EMPTY);

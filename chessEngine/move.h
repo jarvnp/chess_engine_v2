@@ -4,13 +4,25 @@
 #include "piece.h"
 #include "boardpoint.h"
 #include <stdint.h>
+#include <string>
 
-struct Move{
-    int8_t fromX;
-    int8_t fromY;
-    int8_t toX;
-    int8_t toY;
-    int8_t promotionTo;
+class Move
+{
+public:
+    Move();
+    Move(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, int8_t promotionTo);
+    Move(const Move& move);
+    Move(std::string moveStr);
+
+    bool isOkInit();
+
+    int8_t fromX_;
+    int8_t fromY_;
+    int8_t toX_;
+    int8_t toY_;
+    int8_t promotionTo_;
+private:
+    bool isOkInit_ = true;
 };
 
 

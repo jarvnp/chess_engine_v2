@@ -8,13 +8,13 @@
 //operator for printing moves
 ostream& operator<<(ostream& stream, const Move& move)
 {
-    char fromX = (8-move.fromX)+'0';
-    char fromY = move.fromY+'a';
-    char toX = (8-move.toX)+'0';
-    char toY = move.toY+'a';
+    char fromX = (8-move.fromX_)+'0';
+    char fromY = move.fromY_+'a';
+    char toX = (8-move.toX_)+'0';
+    char toY = move.toY_+'a';
     char promotion = 0;
-    if(move.promotionTo != EMPTY){
-        switch(move.promotionTo){
+    if(move.promotionTo_ != EMPTY){
+        switch(move.promotionTo_){
         case QUEEN:
             promotion = 'q';
             break;
@@ -89,63 +89,14 @@ bool Board::makeMoveIfAllowed(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY
     return true;
 }
 
-bool Board::userMakeMoveIfAllowed(string move)
+bool Board::userMakeMoveIfAllowed(string moveStr)
 {
-    if(move.size() < 4){
-        return false;
-    }
-    if(move.size() > 5){
-        return false;
-    }
-    int8_t fromX = move[1];
-    int8_t fromY = move[0];
-    int8_t toX = move[3];
-    int8_t toY = move[2];
-    int8_t promotion = EMPTY;
-    if(move.size() > 4){
-        promotion = move[4];
+    Move move(moveStr);
+    if(!move.isOkInit()){
+      return false;
     }
 
-    fromX = fromX - '1';     //  tranform '1' - '8' to 0-7
-    fromX = 7-fromX;        //mirror
-    toX = toX - '1';
-    toX = 7-toX;
-
-    fromY = fromY - 'a';
-    toY = toY - 'a';
-
-    if(fromX < 0 || fromX > 7){
-        return false;
-    }
-    if(fromY < 0 || fromY > 7){
-        return false;
-    }
-    if(toX < 0 || toX > 7){
-        return false;
-    }
-    if(toY < 0 || toY > 7){
-        return false;
-    }
-
-    if(promotion != 0){
-        if(promotion == 'q'){
-            promotion = QUEEN;
-        }
-        else if(promotion == 'r'){
-            promotion = ROOK;
-        }
-        else if(promotion == 'b'){
-            promotion = BISHOP;
-        }
-        else if(promotion == 'k'){
-            promotion = KNIGHT;
-        }
-        else{
-            return false;
-        }
-    }
-
-    return makeMoveIfAllowed(fromX, fromY, toX, toY,promotion);
+    return makeMoveIfAllowed(move.fromX_, move.fromY_, move.toX_, move.toY_,move.promotionTo_);
 
 }
 
@@ -209,8 +160,8 @@ int16_t Board::searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPos
 
 
             moveBackupData backup = makeAMove(
-                        cache->moves_[index].move_.fromX, cache->moves_[index].move_.fromY,
-                        cache->moves_[index].move_.toX,cache->moves_[index].move_.toY,cache->moves_[index].move_.promotionTo);
+                        cache->moves_[index].move_.fromX_, cache->moves_[index].move_.fromY_,
+                        cache->moves_[index].move_.toX_,cache->moves_[index].move_.toY_,cache->moves_[index].move_.promotionTo_);
             if(cache->moves_[index].nextCache_ == nullptr){
                 cache->moves_[index].nextCache_ = new CachedPosition();
             }
@@ -587,7 +538,7 @@ bool Board::isAllowedMoveForRook(int8_t fromX, int8_t fromY, int8_t toX, int8_t 
      }
      else{
        return false;
-     } 
+     }
      return true;
 }
 
@@ -822,7 +773,7 @@ bool Board::isAllowedMoveNoCheckTest(int8_t fromX, int8_t fromY, int8_t toX, int
 
 moveBackupData Board::makeAMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, int8_t promotionTo)
 {
-    movesMade.push_back({fromX,fromY,toX,toY,promotionTo});
+    movesMade.push_back(Move(fromX,fromY,toX,toY,promotionTo));
 
     moveBackupData moveBackup;
     moveBackup.fromX = fromX;
@@ -1017,22 +968,6 @@ void Board::reverseAMove(moveBackupData& move)
     //opponents turn
     turn_ = !turn_;
 
-
-    for(uint32_t i=0; i<8; i++){
-        for(uint32_t j=0; j<8; j++){
-            if(board_[i][j].getPieceType() == EN_PASSANT_PAWN && board_[i][j].getPieceIndex() != EN_PASSANT_INDEX){
-                cout << "wtfreverse?";
-                cout << "Moves made: ";
-                for(Move move: movesMade){
-                    cout << move << " ";
-                }
-                cout << "\n";
-                cout << "turn: " << turn_*1 << "\n";
-                cout << boardFen() << "\n";
-                while(1){};
-            }
-        }
-    }
 }
 
 

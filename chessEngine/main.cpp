@@ -5,7 +5,7 @@
 
 using namespace std;
 
-int main()
+int main(int argc, char* argv[])
 {
     srand(time(NULL));
     string fen;
@@ -21,6 +21,7 @@ int main()
         }
         while(!a.userMakeMoveIfAllowed(move)){
             cout << "illegal move" << endl;
+            cin >> move;
         }
         a.printBoard(cout);
     }
