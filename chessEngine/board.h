@@ -32,7 +32,8 @@ public:
     bool isAllowedMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, int8_t promotionTo = EMPTY);
 
     //search for best move from this board position
-    void searchForMove(int8_t depth);
+    //use maxTimeMillis amount of time
+    void searchForMove(uint32_t maxTimeSeconds);
 
     string boardFen();
 
@@ -56,7 +57,7 @@ private:
     int8_t turn_; //whose turn it is
 
     //search for a move with alpha-beta pruning and a cache to help with move ordering (use with iterative deepening)
-    int16_t searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPosition* cache);
+    int16_t searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPosition* cache, time_t& endTime);
 
     //init board from fen
     void fenToBoard(string fen);

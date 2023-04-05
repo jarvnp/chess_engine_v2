@@ -3,6 +3,7 @@
 #include <chrono>
 #include <algorithm>
 #include <random>
+#include <time.h>
 
 //operator for printing moves
 ostream& operator<<(ostream& stream, const Move& move)
@@ -150,8 +151,14 @@ bool Board::userMakeMoveIfAllowed(string move)
 
 
 
-int16_t Board::searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPosition* cache)
+int16_t Board::searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPosition* cache, time_t& endTime)
 {
+    //no need to check time every time
+    if(nodes%1000 == 0){
+        if(difftime(time(nullptr), endTime) > 0 ){
+            return 0;       //return value doesn't matter, we will discard everything from an unfinished search
+        }
+    }
     nodes++;
 
     if(depth == 0){
@@ -207,7 +214,7 @@ int16_t Board::searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPos
             if(cache->moves_[index].nextCache_ == nullptr){
                 cache->moves_[index].nextCache_ = new CachedPosition();
             }
-            int16_t temp = searchForMove(depth-1, beta, alpha, cache->moves_[index].nextCache_);
+            int16_t temp = searchForMove(depth-1, beta, alpha, cache->moves_[index].nextCache_, endTime);
             reverseAMove(backup);
 
            cache->moves_[index].setScore(temp);
@@ -264,11 +271,12 @@ int16_t Board::searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPos
     return bestScore;
 }
 
-void Board::searchForMove(int8_t depth)
+void Board::searchForMove(uint32_t maxTimeSeconds)
 {
     auto start = std::chrono::high_resolution_clock::now();
 
-
+    std::time_t startTime = std::time(nullptr);
+    std::time_t endTime = startTime+ maxTimeSeconds;
 
     nodes = 0;
     int16_t rootValue = WORST_SCORE_FOR_WHITE;
@@ -276,22 +284,28 @@ void Board::searchForMove(int8_t depth)
         rootValue *= -1;
     }
     CachedPosition root = CachedPosition();
-    for(int8_t i=1; i <= depth; i++){
-        searchForMove(i, rootValue,-rootValue, &root);
+    cout << std::difftime(time(nullptr), endTime) << "\n";
+    Move bestMove;
+    for(int8_t i=1; std::difftime(time(nullptr),endTime) <= 0; i++){
+        if(root.getBestMovePtr() != nullptr){
+           bestMove = root.getBestMovePtr()->move_;
+        }
+        searchForMove(i, rootValue,-rootValue, &root, endTime);
 
         cout << "depth: " << i*1 << " nodes: " << nodes <<  "\n";
-        for(auto pos = &root; pos != nullptr && !pos->isEmpty(); pos = pos->moves_[0].nextCache_){
+/*        for(auto pos = &root; pos != nullptr && !pos->isEmpty(); pos = pos->moves_[0].nextCache_){
             cout << pos->moves_[0].move_ << "\t" << pos->moves_[0].getScore() << "\n";
             for(auto move : pos->moves_){
                 cout << "\t" << move.move_ << " " << move.getScore() << "\n";
             }
         }
-        cout << "********\n";
+        cout << "********\n";*/
+
     }
     auto elapsed = std::chrono::high_resolution_clock::now() - start;
     uint32_t micros = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
     cout << "nodes: " << nodes << "\n";
-    cout << "best move: " << root.moves_[0].move_ << "\n";
+    cout << "best move: " << bestMove << "\n";
 
     cout << "nodes/sec: " << 1000000.0*(float)nodes/(float)micros << "\n";
 
