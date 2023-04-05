@@ -8,6 +8,7 @@ using namespace std;
 int main()
 {
     srand(time(NULL));
+<<<<<<< Updated upstream
     string fen;
     getline(cin,fen);
     Board a(fen);
@@ -23,6 +24,16 @@ int main()
             cout << "illegal move" << endl;
         }
         a.printBoard(cout);
+=======
+    Board board;
+    for(int i=1; i<argc; i++){
+      if(!board.userMakeMoveIfAllowed(argv[i])){
+        return EXIT_FAILURE;
+      }
+>>>>>>> Stashed changes
     }
+    board.searchForMove(2);  //2 seconds
+
+
     return 0;
 }
