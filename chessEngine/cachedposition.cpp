@@ -1,21 +1,32 @@
 #include "cachedposition.h"
 #include "constants.h"
 #include <algorithm>
+#include <unordered_set>
 
 CachedPosition::CachedPosition()
 {
 
 }
 
-CachedPosition::~CachedPosition()
-{
-    for(CachedMove move : moves_){
+void collectDeletePointers(std::unordered_set<CachedMove*>& pointers, CachedPosition* pos){
+    for(CachedMove move : pos->moves_){
         if(move.nextCache_ != nullptr){
-            delete move.nextCache_;
+            pointers.insert((CachedMove*)move.nextCache_);
+            collectDeletePointers(pointers,move.nextCache_);
         }
-        move.nextCache_ = nullptr;
     }
 }
+
+CachedPosition::~CachedPosition()
+{
+    std::unordered_set<CachedMove*> pointers;
+    collectDeletePointers(pointers,this);
+    for(auto pointer : pointers){
+        delete pointer;
+    }
+}
+
+
 
 const CachedMove* CachedPosition::getBestMovePtr() const
 {

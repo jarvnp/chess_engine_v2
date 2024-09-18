@@ -11,31 +11,27 @@ class Move
 public:
     Move();
     Move(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, int8_t promotionTo);
-    Move(const Move& move);
     Move(std::string moveStr);
 
     bool isOkInit();
 
-    int8_t fromX_;
-    int8_t fromY_;
-    int8_t toX_;
-    int8_t toY_;
-    int8_t promotionTo_;
+    BoardPoint from;
+    BoardPoint to;
+    int8_t promotionTo_; // TODO is not clear if this is the piece type or does this include the color? (currently I think this does not include the color)
 private:
     bool isOkInit_ = true;
 };
 
 
 struct moveBackupData{  //information needed to reverse a move
-    int8_t fromX;
-    int8_t fromY;
-    int8_t toX;
-    int8_t toY;
-    bool isPromoted;
+    Move move;
     Piece capturedPiece;
+    Piece movedPiece; // The original moved piece (not promoted)
     BoardPoint removedEnPassant;
     int16_t scoreChange;
-    int8_t castlingInfo;
+    int8_t oldCastlingInfo;
+    int8_t newCastlingInfo; // TODO these must be formatted correctly (using 4 bits)
+    uint64_t hashChange;
 };
 
 #endif // MOVE_H

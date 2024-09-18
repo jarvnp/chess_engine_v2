@@ -7,13 +7,14 @@ using namespace std;
 
 int main(int argc, char* argv[])
 {
-    srand(time(NULL));
-    string fen;
-    getline(cin,fen);
-    Board a(fen);
-    a.printBoard(cout);
+    //srand(time(NULL));
+    srand(0);
+    //string fen;
+    //getline(cin,fen);
+    Board a;
     while(1){
-        a.searchForMove(5);
+        a.searchForMove(20);
+        a.printBoard(cout);
         string move;
         cin >> move;
         if(move == "q"){
@@ -23,7 +24,6 @@ int main(int argc, char* argv[])
             cout << "illegal move" << endl;
             cin >> move;
         }
-        a.printBoard(cout);
     }
     return 0;
 }

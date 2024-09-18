@@ -4,14 +4,15 @@
 #include <algorithm>
 #include <random>
 #include <time.h>
+#include <unordered_map>
 
 //operator for printing moves
 ostream& operator<<(ostream& stream, const Move& move)
 {
-    char fromX = (8-move.fromX_)+'0';
-    char fromY = move.fromY_+'a';
-    char toX = (8-move.toX_)+'0';
-    char toY = move.toY_+'a';
+    char fromX = (8-move.from.x())+'0';
+    char fromY = move.from.y()+'a';
+    char toX = (8-move.to.x())+'0';
+    char toY = move.to.y()+'a';
     char promotion = 0;
     if(move.promotionTo_ != EMPTY){
         switch(move.promotionTo_){
@@ -75,7 +76,7 @@ void Board::printBoard(ostream &stream)
     stream << endl;
     stream << boardscore_ << " " << evaluateBoard() << "\n";
 
-    vector<Move> moves;
+    stream << "HASH: " << hasher.hash << "\n";
 }
 
 bool Board::makeMoveIfAllowed(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, int8_t promotionTo)
@@ -99,13 +100,13 @@ bool Board::userMakeMoveIfAllowed(string moveStr)
       return false;
     }
 
-    return makeMoveIfAllowed(move.fromX_, move.fromY_, move.toX_, move.toY_,move.promotionTo_);
+    return makeMoveIfAllowed(move.from.x(), move.from.y(), move.to.x(), move.to.y(),move.promotionTo_);
 
 }
 
 
 
-int16_t Board::searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPosition* cache, time_t& endTime)
+int16_t Board::searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPosition* cache, transposMap& transposTable, time_t& endTime)
 {
     //no need to check time every time
     if(nodes%1000 == 0){
@@ -122,8 +123,31 @@ int16_t Board::searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPos
     if(!cache->isInitialized()){
         cache->initColor(turn_);
     }
+    transposTable[hasher.hash] = {cache, depth};
 
+    /*
+    if(hashToFen.count(hasher.hash)){
+        if(boardFen() != hashToFen[hasher.hash]){
+            cout << boardFen() << "\n" << hashToFen[hasher.hash] << "\n";
+            exit(EXIT_FAILURE);
+        }
+    }
+    hashToFen[hasher.hash] = boardFen();*/
 
+    /*
+    string fen = boardFen();
+    if(fenToHash.count(fen)){
+        if(hasher.hash != fenToHash[fen]){
+            cout << boardFen() << "\n" << fenToHash[fen] <<  "\n" << hasher.hash << "\n";
+            for(Move move : movesMade){
+                cout << move << " " ;
+            }
+            cout << "\n";
+            exit(EXIT_FAILURE);
+        }
+    }
+    fenToHash[fen] = hasher.hash;
+    */
 
     //for debugging
     /*if(boardscore_ != evaluateBoard()){
@@ -132,46 +156,60 @@ int16_t Board::searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPos
         while(1);
     }*/
 
-
-    int16_t bestScore = WORST_SCORE_FOR_WHITE;
+    int16_t worstPossibleScore = WORST_SCORE_FOR_WHITE;
     if(turn_ == BLACK){
-        bestScore *= -1;
+        worstPossibleScore *= -1;
     }
-
+    int16_t bestScore = worstPossibleScore;
 
     Cache::size_type index = 0;
     uint8_t indeces[] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
     shuffle(indeces, indeces+16,std::default_random_engine(cache->seed_));
 
     do{
-
         if( (!cache->isAllMovesFetched()) && (index >= cache->moves_.size())){
             vector<Move> moves;
             findLegalMovesForIndex(moves, indeces[cache->fetchedLegalMovesIndex_]);
             cache->fetchedLegalMovesIndex_++;
             for(auto move : moves){
-                int16_t scoreEstimate = WORST_SCORE_FOR_WHITE;
-                if(turn_ == BLACK){
-                    scoreEstimate *= -1;
-                }
-                cache->moves_.push_back(CachedMove(move,scoreEstimate));
+                cache->moves_.push_back(CachedMove(move,boardscore_));
             }
         }
 
         for(; index < cache->moves_.size(); index++){
-
-
-
             moveBackupData backup = makeAMove(
-                        cache->moves_[index].move_.fromX_, cache->moves_[index].move_.fromY_,
-                        cache->moves_[index].move_.toX_,cache->moves_[index].move_.toY_,cache->moves_[index].move_.promotionTo_);
+                        cache->moves_[index].move_.from.x(), cache->moves_[index].move_.from.y(),
+                        cache->moves_[index].move_.to.x(),cache->moves_[index].move_.to.y(),cache->moves_[index].move_.promotionTo_);
             if(cache->moves_[index].nextCache_ == nullptr){
-                cache->moves_[index].nextCache_ = new CachedPosition();
+                if(transposTable.count(hasher.hash)){
+                    if(transposTable[hasher.hash].second < depth){
+                       /* cout << transposTable[hasher.hash].second*1 << " " << depth*1 << "\n";
+                        for(Move move : movesMade){
+                            cout << move << " " ;
+                        }
+                        cout << "\n";*/
+                        cache->moves_[index].nextCache_ = transposTable[hasher.hash].first;
+                        //cache->moves_[index].nextCache_ = new CachedPosition();
+
+                        //std::cout << "Got some cached moves\n";
+                    }
+                    else{
+                        //cache->moves_[index].nextCache_ = new CachedPosition();
+                        reverseAMove(backup);
+                         // The position to which this move leads is already checked or belongs to this same search tree. Don't check it here?
+                        cache->moves_[index].setScore(worstPossibleScore); 
+                        //std::cout << "Skipped stuff\n";
+                        continue;
+                    }
+                    //std::cout << "YEEEYY\n";
+                }else{
+                    cache->moves_[index].nextCache_ = new CachedPosition();
+                }
             }
-            int16_t temp = searchForMove(depth-1, beta, alpha, cache->moves_[index].nextCache_, endTime);
+            int16_t temp = searchForMove(depth-1, beta, alpha, cache->moves_[index].nextCache_, transposTable, endTime);
             reverseAMove(backup);
 
-           cache->moves_[index].setScore(temp);
+            cache->moves_[index].setScore(temp);
 
             if(isBetterOrEqScore(temp,bestScore,turn_)){
                 bestScore = temp;
@@ -194,17 +232,10 @@ int16_t Board::searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPos
                 }
                 return temp;
             }
-
-
             if(!isBetterOrEqScore(beta,temp, turn_)){
                 beta = temp;
             }
-
-
         }
-
-
-
     }while(cache->fetchedLegalMovesIndex_ < 16);
 
     //if no legal moves were found
@@ -238,18 +269,23 @@ void Board::searchForMove(uint32_t maxTimeSeconds)
         rootValue *= -1;
     }
     CachedPosition root = CachedPosition();
+    transposMap transposTable;
     Move bestMove;
     for(int8_t i=1; std::difftime(time(nullptr),endTime) <= 0; i++){
         if(root.getBestMovePtr() != nullptr){
            bestMove = root.getBestMovePtr()->move_;
         }
-        searchForMove(i, rootValue,-rootValue, &root, endTime);
+        searchForMove(i, rootValue,-rootValue, &root, transposTable, endTime);
 
-
+        cout << "Searched: " << i*1 << " " << "Nodes: " << nodes <<"\n";
 
     }
     auto elapsed = std::chrono::high_resolution_clock::now() - start;
     uint32_t micros = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+
+    cout << "Micros: " << micros << "\n";
+    cout << "Nodes: " << nodes << "\n";
+    cout << "Nodes/sec: " << ((uint64_t)nodes*1000000LL)/(micros) << "\n";
 
     cout << bestMove;
 
@@ -770,25 +806,23 @@ moveBackupData Board::makeAMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t t
     movesMade.push_back(Move(fromX,fromY,toX,toY,promotionTo));
 
     moveBackupData moveBackup;
-    moveBackup.fromX = fromX;
-    moveBackup.fromY = fromY;
-    moveBackup.toX = toX;
-    moveBackup.toY = toY;
-    moveBackup.isPromoted = (promotionTo != EMPTY);
-
+    moveBackup.move = Move(fromX,fromY,toX,toY,promotionTo);
+    moveBackup.movedPiece = board_[fromX][fromY];
 
     int8_t color = board_[fromX][fromY].color();
 
-
-
-
-    moveBackup.castlingInfo = 0;
-    moveBackup.castlingInfo |= castlingIsPossible_[0][0];
-    moveBackup.castlingInfo |= castlingIsPossible_[0][1]<<1;
-    moveBackup.castlingInfo |= castlingIsPossible_[1][0]<<2;
-    moveBackup.castlingInfo |= castlingIsPossible_[1][1]<<3;
+    moveBackup.oldCastlingInfo = 0;
+    moveBackup.oldCastlingInfo |= castlingIsPossible_[0][0];
+    moveBackup.oldCastlingInfo |= castlingIsPossible_[0][1]<<1;
+    moveBackup.oldCastlingInfo |= castlingIsPossible_[1][0]<<2;
+    moveBackup.oldCastlingInfo |= castlingIsPossible_[1][1]<<3;
     //update castling information
     bool castling = updateCastlingInfo(fromX,fromY,toX,toY);
+    moveBackup.newCastlingInfo = 0;
+    moveBackup.newCastlingInfo |= castlingIsPossible_[0][0];
+    moveBackup.newCastlingInfo |= castlingIsPossible_[0][1]<<1;
+    moveBackup.newCastlingInfo |= castlingIsPossible_[1][0]<<2;
+    moveBackup.newCastlingInfo |= castlingIsPossible_[1][1]<<3;
 
     //check for enpassant capture
     bool enPassantCaptured = false;
@@ -811,10 +845,6 @@ moveBackupData Board::makeAMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t t
     if(moveBackup.capturedPiece.getPieceType() != EMPTY){
         pieceLocations_[!color][moveBackup.capturedPiece.getPieceIndex()].setNotOnBoard();    //piece was captured
     }
-
-
-
-
 
     //remove pawn if enpassant captured
     if(enPassantCaptured){
@@ -871,7 +901,7 @@ moveBackupData Board::makeAMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t t
     //opponents turn
     turn_ = !turn_;
 
-
+    hasher.makeAMove(moveBackup);
     return moveBackup;
 }
 
@@ -879,17 +909,17 @@ void Board::reverseAMove(moveBackupData& move)
 {
     movesMade.pop_back();
 
-    int8_t color = board_[move.toX][move.toY].color();
+    int8_t color = board_[move.move.to.x()][move.move.to.y()].color();
 
     //restore promotion
-    if(move.isPromoted){
-        board_[move.toX][move.toY].setPiece(PAWN,color);
+    if(move.move.promotionTo_ != EMPTY){
+        board_[move.move.to.x()][move.move.to.y()].setPiece(PAWN,color);
     }
 
     //remove spawned en_passant pawn
-    if((board_[move.toX][move.toY].getPieceType() == PAWN) && (abs(move.toX - move.fromX) == 2)){
+    if((board_[move.move.to.x()][move.move.to.y()].getPieceType() == PAWN) && (abs(move.move.to.x() - move.move.from.x()) == 2)){
         int8_t dir = color*2-1;     //-1 or 1, depending on color
-        board_[move.toX-dir][move.toY].setPiece(EMPTY);   //remove en passant
+        board_[move.move.to.x()-dir][move.move.to.y()].setPiece(EMPTY);   //remove en passant
         pieceLocations_[color][EN_PASSANT_INDEX].setNotOnBoard();
     }
 
@@ -903,32 +933,29 @@ void Board::reverseAMove(moveBackupData& move)
 
 
     //restore castling info
-    castlingIsPossible_[0][0] = move.castlingInfo&1;
-    castlingIsPossible_[0][1] = (move.castlingInfo>>1)&1;
-    castlingIsPossible_[1][0] = (move.castlingInfo>>2)&1;
-    castlingIsPossible_[1][1] = (move.castlingInfo>>3)&1;
+    castlingIsPossible_[0][0] = move.oldCastlingInfo&1;
+    castlingIsPossible_[0][1] = (move.oldCastlingInfo>>1)&1;
+    castlingIsPossible_[1][0] = (move.oldCastlingInfo>>2)&1;
+    castlingIsPossible_[1][1] = (move.oldCastlingInfo>>3)&1;
 
 
     //restore board score
     boardscore_ += move.scoreChange;
 
-
-
-
     bool enPassantCaptured = false;
     //restore removed pawn in case of en_passant capture
-    if( (board_[move.toX][move.toY].getPieceType() == PAWN) && (move.capturedPiece.getPieceType() == EN_PASSANT_PAWN)){
+    if( (board_[move.move.to.x()][move.move.to.y()].getPieceType() == PAWN) && (move.capturedPiece.getPieceType() == EN_PASSANT_PAWN)){
         enPassantCaptured = true;
-        board_[move.fromX][move.toY].setPiece(PAWN,!color);
-        board_[move.fromX][move.toY].setPieceIndex(move.capturedPiece.getPieceIndex());
-        pieceLocations_[!color][move.capturedPiece.getPieceIndex()] = {move.fromX,move.toY};  //in this case the piece index of the removed pawn is stored here
+        board_[move.move.from.x()][move.move.to.y()].setPiece(PAWN,!color);
+        board_[move.move.from.x()][move.move.to.y()].setPieceIndex(move.capturedPiece.getPieceIndex());
+        pieceLocations_[!color][move.capturedPiece.getPieceIndex()] = {move.move.from.x(),move.move.to.y()};  //in this case the piece index of the removed pawn is stored here
     }
 
     //restore rook position if castling was done
-    if(board_[move.toX][move.toY].getPieceType() == KING && (abs(move.fromY - move.toY) > 1)){
+    if(board_[move.move.to.x()][move.move.to.y()].getPieceType() == KING && (abs(move.move.from.y() - move.move.to.y()) > 1)){
         int8_t rookFromY;
         int8_t rookToY;
-        if(move.toY > move.fromY){
+        if(move.move.to.y() > move.move.from.y()){
             //kingside castling
             rookFromY = 7;
             rookToY = 5;
@@ -938,30 +965,30 @@ void Board::reverseAMove(moveBackupData& move)
             rookFromY = 0;
             rookToY = 3;
         }
-        board_[move.fromX][rookFromY] = board_[move.fromX][rookToY];
-        board_[move.fromX][rookToY].setPiece(EMPTY);
-        pieceLocations_[color][board_[move.fromX][rookFromY].getPieceIndex()] = {move.fromX,rookFromY};
+        board_[move.move.from.x()][rookFromY] = board_[move.move.from.x()][rookToY];
+        board_[move.move.from.x()][rookToY].setPiece(EMPTY);
+        pieceLocations_[color][board_[move.move.from.x()][rookFromY].getPieceIndex()] = {move.move.from.x(),rookFromY};
     }
 
 
     //undo move
-    board_[move.fromX][move.fromY] = board_[move.toX][move.toY];
-    board_[move.toX][move.toY].setPiece(EMPTY);
-    pieceLocations_[color][board_[move.fromX][move.fromY].getPieceIndex()] = {move.fromX,move.fromY};
+    board_[move.move.from.x()][move.move.from.y()] = board_[move.move.to.x()][move.move.to.y()];
+    board_[move.move.to.x()][move.move.to.y()].setPiece(EMPTY);
+    pieceLocations_[color][board_[move.move.from.x()][move.move.from.y()].getPieceIndex()] = {move.move.from.x(),move.move.from.y()};
     if(move.capturedPiece.getPieceType() != EMPTY){
-        board_[move.toX][move.toY] = move.capturedPiece;
+        board_[move.move.to.x()][move.move.to.y()] = move.capturedPiece;
         if(enPassantCaptured){
-            pieceLocations_[!color][EN_PASSANT_INDEX] = {move.toX,move.toY};
-            board_[move.toX][move.toY].setPieceIndex(EN_PASSANT_INDEX); //the index of the captured pawn is stored in move.capturedPiece
+            pieceLocations_[!color][EN_PASSANT_INDEX] = {move.move.to.x(),move.move.to.y()};
+            board_[move.move.to.x()][move.move.to.y()].setPieceIndex(EN_PASSANT_INDEX); //the index of the captured pawn is stored in move.capturedPiece
         }
         else{
-            pieceLocations_[!color][move.capturedPiece.getPieceIndex()] = {move.toX,move.toY};
+            pieceLocations_[!color][move.capturedPiece.getPieceIndex()] = {move.move.to.x(),move.move.to.y()};
         }
     }
 
     //opponents turn
     turn_ = !turn_;
-
+    hasher.reverseAMove(move.hashChange);
 }
 
 

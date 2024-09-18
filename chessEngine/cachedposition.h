@@ -36,7 +36,7 @@ public:
     uint8_t fetchedLegalMovesIndex_ = 0;
 
     //Legal moves are fethed in random order, determined by this seed
-    uint32_t seed_ = time(NULL);
+    uint32_t seed_ = rand();
 
     Cache moves_;
 
@@ -46,5 +46,6 @@ private:
     bool color_;
 
 };
+
 
 #endif // CACHEDPOSITION_H

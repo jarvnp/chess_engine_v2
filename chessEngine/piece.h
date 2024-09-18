@@ -35,7 +35,6 @@ public:
     Piece(int8_t piece, int8_t pieceIndex);
     Piece(Piece& piece);
     Piece();
-    Piece& operator= (Piece& piece);
 
 
     bool color();

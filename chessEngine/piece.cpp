@@ -5,17 +5,12 @@ Piece::Piece(int8_t piece, int8_t pieceIndex):piece_(piece), pieceIndex_(pieceIn
 
 Piece::Piece(Piece &piece)
 {
-    Piece(piece.getPiece(), piece.getPieceIndex());
+    piece_ = piece.getPiece();
+    pieceIndex_ = piece.getPieceIndex();
 }
 
 Piece::Piece(){}
 
-Piece &Piece::operator=(Piece &piece)
-{
-    piece_ = piece.getPiece();
-    pieceIndex_ = piece.getPieceIndex();
-    return *this;
-}
 
 bool Piece::color()
 {

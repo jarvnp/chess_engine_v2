@@ -7,11 +7,13 @@
 #include "cachedposition.h"
 #include "move.h"
 #include "constants.h"
+#include "hasher.h"
 #include <string>
 #include <vector>
 #include <iostream>
 using namespace std;
 
+const int N_PIECES = 16;
 
 
 class Board
@@ -32,7 +34,7 @@ public:
     bool isAllowedMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, int8_t promotionTo = EMPTY);
 
     //search for best move from this board position
-    //use maxTimeMillis amount of time
+    //use maxTimeSeconds amount of time
     void searchForMove(uint32_t maxTimeSeconds);
 
     string boardFen();
@@ -42,22 +44,26 @@ public:
     vector<Move> movesMade;
     uint64_t time1 = 0;
     uint64_t time2 = 0;
+    unordered_map<uint64_t,string> hashToFen;
+    unordered_map<string,uint64_t> fenToHash;
 
-
-private:
     Piece board_[8][8]; //8x8 array,   x,y, where x is vertical (1...8) and y is horizontal (a...h)  :)
+    bool castlingIsPossible_[2][2];         // {white queenside, white kingside}{black queenside, black kingside}
+    int8_t turn_; //whose turn it is
 
-     //an array with information about every pieces' location. For example pieceLocations_[0][0] has information about where one white player's pawn is
+    //an array with information about every pieces' location. For example pieceLocations_[0][0] has information about where one white player's pawn is
     //2 players each with 16 pieces + space for en passant pawn for both players
     BoardPoint pieceLocations_[2][17];
 
-    bool castlingIsPossible_[2][2];         // {white queenside, white kingside}{black queenside, black kingside}
-
+private:
     int16_t boardscore_;
-    int8_t turn_; //whose turn it is
 
+    Hasher hasher;
+
+
+    typedef std::unordered_map<uint64_t,std::pair<CachedPosition*,int8_t>> transposMap; // int8_t holds the depth that was used when this position was seen
     //search for a move with alpha-beta pruning and a cache to help with move ordering (use with iterative deepening)
-    int16_t searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPosition* cache, time_t& endTime);
+    int16_t searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPosition* cache, transposMap& transposTable, time_t& endTime);
 
     //init board from fen
     void fenToBoard(string fen);
