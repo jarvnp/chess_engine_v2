@@ -23,8 +23,6 @@ public:
 
     Move move_;
 
-    mutable CachedPosition* nextCache_ = nullptr;
-
     bool operator<(const CachedMove& a)const;
 
 private:

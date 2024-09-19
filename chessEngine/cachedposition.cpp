@@ -8,25 +8,6 @@ CachedPosition::CachedPosition()
 
 }
 
-void collectDeletePointers(std::unordered_set<CachedMove*>& pointers, CachedPosition* pos){
-    for(CachedMove move : pos->moves_){
-        if(move.nextCache_ != nullptr){
-            pointers.insert((CachedMove*)move.nextCache_);
-            collectDeletePointers(pointers,move.nextCache_);
-        }
-    }
-}
-
-CachedPosition::~CachedPosition()
-{
-    std::unordered_set<CachedMove*> pointers;
-    collectDeletePointers(pointers,this);
-    for(auto pointer : pointers){
-        delete pointer;
-    }
-}
-
-
 
 const CachedMove* CachedPosition::getBestMovePtr() const
 {

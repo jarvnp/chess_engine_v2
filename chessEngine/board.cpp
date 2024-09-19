@@ -123,7 +123,6 @@ int16_t Board::searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPos
     if(!cache->isInitialized()){
         cache->initColor(turn_);
     }
-    transposTable[hasher.hash] = {cache, depth};
 
     /*
     if(hashToFen.count(hasher.hash)){
@@ -180,33 +179,17 @@ int16_t Board::searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPos
             moveBackupData backup = makeAMove(
                         cache->moves_[index].move_.from.x(), cache->moves_[index].move_.from.y(),
                         cache->moves_[index].move_.to.x(),cache->moves_[index].move_.to.y(),cache->moves_[index].move_.promotionTo_);
-            if(cache->moves_[index].nextCache_ == nullptr){
-                if(transposTable.count(hasher.hash)){
-                    if(transposTable[hasher.hash].second < depth){
-                       /* cout << transposTable[hasher.hash].second*1 << " " << depth*1 << "\n";
-                        for(Move move : movesMade){
-                            cout << move << " " ;
-                        }
-                        cout << "\n";*/
-                        cache->moves_[index].nextCache_ = transposTable[hasher.hash].first;
-                        //cache->moves_[index].nextCache_ = new CachedPosition();
-
-                        //std::cout << "Got some cached moves\n";
-                    }
-                    else{
-                        //cache->moves_[index].nextCache_ = new CachedPosition();
-                        reverseAMove(backup);
-                         // The position to which this move leads is already checked or belongs to this same search tree. Don't check it here?
-                        cache->moves_[index].setScore(worstPossibleScore); 
-                        //std::cout << "Skipped stuff\n";
-                        continue;
-                    }
-                    //std::cout << "YEEEYY\n";
-                }else{
-                    cache->moves_[index].nextCache_ = new CachedPosition();
+            if(transposTable.count(hasher.hash)){
+                if(transposTable[hasher.hash].second >= depth){
+                    reverseAMove(backup);
+                        // The position to which this move leads is already checked or belongs to this same search tree. Don't check it here?
+                    cache->moves_[index].setScore(worstPossibleScore);
+                    continue;
                 }
+            }else{
+                transposTable[hasher.hash] = {new CachedPosition(), depth-1};
             }
-            int16_t temp = searchForMove(depth-1, beta, alpha, cache->moves_[index].nextCache_, transposTable, endTime);
+            int16_t temp = searchForMove(depth-1, beta, alpha, transposTable[hasher.hash].first, transposTable, endTime);
             reverseAMove(backup);
 
             cache->moves_[index].setScore(temp);
@@ -268,14 +251,15 @@ void Board::searchForMove(uint32_t maxTimeSeconds)
     if(turn_ == WHITE){
         rootValue *= -1;
     }
-    CachedPosition root = CachedPosition();
+    CachedPosition* root = new CachedPosition();
     transposMap transposTable;
     Move bestMove;
     for(int8_t i=1; std::difftime(time(nullptr),endTime) <= 0; i++){
-        if(root.getBestMovePtr() != nullptr){
-           bestMove = root.getBestMovePtr()->move_;
+        if(root->getBestMovePtr() != nullptr){
+           bestMove = root->getBestMovePtr()->move_;
         }
-        searchForMove(i, rootValue,-rootValue, &root, transposTable, endTime);
+        transposTable[hasher.hash] = {root,i};
+        searchForMove(i, rootValue,-rootValue, root, transposTable, endTime);
 
         cout << "Searched: " << i*1 << " " << "Nodes: " << nodes <<"\n";
 
@@ -287,9 +271,11 @@ void Board::searchForMove(uint32_t maxTimeSeconds)
     cout << "Nodes: " << nodes << "\n";
     cout << "Nodes/sec: " << ((uint64_t)nodes*1000000LL)/(micros) << "\n";
 
+    for(auto it = transposTable.begin(); it != transposTable.end(); it++){
+        delete it->second.first;
+    }
+
     cout << bestMove;
-
-
 }
 
 string Board::boardFen(){

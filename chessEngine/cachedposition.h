@@ -15,8 +15,6 @@ class CachedPosition
 public:
     CachedPosition();
 
-    ~CachedPosition();
-
     //return pointer to first element of moves_ (or nullptr if moves_ is empty)
     const CachedMove* getBestMovePtr() const;
 

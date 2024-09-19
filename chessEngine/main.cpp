@@ -13,7 +13,7 @@ int main(int argc, char* argv[])
     //getline(cin,fen);
     Board a;
     while(1){
-        a.searchForMove(20);
+        a.searchForMove(5);
         a.printBoard(cout);
         string move;
         cin >> move;
