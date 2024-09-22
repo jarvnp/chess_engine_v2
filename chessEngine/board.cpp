@@ -165,13 +165,27 @@ int16_t Board::searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPos
     uint8_t indeces[] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
     shuffle(indeces, indeces+16,std::default_random_engine(cache->seed_));
 
+    //TODO set a flag when these are fetched
+    if(!movesMade.empty()){
+        Move lastMove = movesMade.back();
+        if(cache->moves_.empty()){
+            vector<Move> moves;
+            findThreats(board_,moves,lastMove.to.x(),lastMove.to.y());
+            for(auto move : moves){
+                cache->moves_.push_back(CachedMove(move,boardscore_));
+            }
+        }
+    }
+
     do{
         if( (!cache->isAllMovesFetched()) && (index >= cache->moves_.size())){
             vector<Move> moves;
             findLegalMovesForIndex(moves, indeces[cache->fetchedLegalMovesIndex_]);
             cache->fetchedLegalMovesIndex_++;
             for(auto move : moves){
-                cache->moves_.push_back(CachedMove(move,boardscore_));
+                if(!(!movesMade.empty() && move.to == movesMade.back().to)){  // These have been fetched already above
+                    cache->moves_.push_back(CachedMove(move,boardscore_));
+                } 
             }
         }
 
@@ -362,7 +376,6 @@ string Board::boardFen(){
 bool Board::isAllowedMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, int8_t promotionTo)
 {
 
-
     if(board_[fromX][fromY].color() != turn_){
         return false;
     }
@@ -371,12 +384,12 @@ bool Board::isAllowedMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, in
     }
     int8_t color = board_[fromX][fromY].color();
 
-    moveBackupData moveBackup = makeAMove(fromX, fromY, toX, toY, promotionTo);
+    moveBackupData moveBackup = makeAMoveLight(fromX, fromY, toX, toY, promotionTo);
     if(isChecked(pieceLocations_[color][KING_INDEX].x(), pieceLocations_[color][KING_INDEX].y(),color)){
-        reverseAMove(moveBackup);
+        reverseAMoveLight(moveBackup);
         return false;
     }
-    reverseAMove(moveBackup);
+    reverseAMoveLight(moveBackup);
     return true;
 }
 
@@ -524,12 +537,16 @@ void Board::initPieceArray()
 
 bool Board::isOwn(int8_t x, int8_t y, int8_t color)
 {
-    if(board_[x][y].getPieceType() == EMPTY){
-        return false;
-    }
-    return board_[x][y].color() == color;
+    return isOwnFunction(board_, x, y, color);
 }
 
+bool isOwnFunction(Piece board[8][8], int8_t x, int8_t y, int8_t color)
+{
+    if(board[x][y].getPieceType() == EMPTY){
+        return false;
+    }
+    return board[x][y].color() == color;
+}
 
 bool Board::isAllowedMoveForRook(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY)
 {
@@ -678,68 +695,30 @@ bool Board::isAllowedMoveForKing(int8_t fromX, int8_t fromY, int8_t toX, int8_t 
     return false;
 }
 
-
-
 bool Board::isChecked(int8_t x, int8_t y, int8_t color){
-    int8_t targetX, targetY;
-    for(int8_t i=0; i<4; i++){
-        int8_t* movingAxis = &targetX;
-        if(i >= 2){
-            movingAxis  = &targetY;
-        }
-        int8_t dir = (i%2)*2-1; //-1 or 1
-        targetX = x;
-        targetY = y;
-        for(*movingAxis +=dir; max(targetX,targetY)<8 && min(targetX,targetY) >= 0; *movingAxis += dir){
-            if( (board_[targetX][targetY].getPieceType() != EMPTY) && (board_[targetX][targetY].getPieceType() != EN_PASSANT_PAWN)){
-                if(!isOwn(targetX, targetY,color)){
-                    if(board_[targetX][targetY].getPieceType() == QUEEN || board_[targetX][targetY].getPieceType() == ROOK){
-                        return true;
-                    }
-                    if(board_[targetX][targetY].getPieceType() == KING && max(abs(targetX-x), abs(targetY-y)) == 1){
-                        return true;
-                    }
-                }
-                break;
-            }
-        }
-    }
+    vector<Move> moves;
+    findThreats(board_,moves,x,y,color,true);
+    return (moves.size() > 0);
+}
 
-    for(int8_t i=0; i<4; i++){
+// This is not defined inside the class, because it must work with only the board-information
+// (Then we can use makeAMoveLight)
+void findThreats(Piece board[8][8], vector<Move>& moves,int8_t x, int8_t y){
+    findThreats(board,moves,x,y,board[x][y].color(),false);
+}
 
-        int8_t xDir = (i%2)*2-1; //-1 1 -1 1
-        int8_t yDir = (i<2)*2-1; //1 1 -1 -1
-        targetX = x+xDir;
-        targetY = y+yDir;
-        while(max(targetX,targetY)<8 && min(targetX,targetY) >= 0){
-            if( (board_[targetX][targetY].getPieceType() != EMPTY) && (board_[targetX][targetY].getPieceType() != EN_PASSANT_PAWN)){
-                if(!isOwn(targetX, targetY,color)){
-                    if(board_[targetX][targetY].getPieceType() == QUEEN || board_[targetX][targetY].getPieceType() == BISHOP){
-                        return true;
-                    }
-                    if(board_[targetX][targetY].getPieceType() == KING && max(abs(targetX-x), abs(targetY-y)) == 1){
-                        return true;
-                    }
-                    int8_t dir = ((int8_t)((!color)*2))-1;         //-1 or 1 depending on color. The direction of opponent pawn movement
-                    if(board_[targetX][targetY].getPieceType() == PAWN && (targetX+dir == x)){
-                        return true;
-                    }
-                }
-                break;
-            }
-            targetX+=xDir;
-            targetY+=yDir;
-        }
-    }
-
-
+// TODO: Does not find en passant threats
+void findThreats(Piece board[8][8],vector<Move>& moves,int8_t x, int8_t y, int8_t color, bool stopForOne){
     int8_t dX = 2;
     int8_t dY = 1;
     for(int8_t i=0; i<8; i++){
         if(min(x+dX,y+dY) >= 0 && max(x+dX, y+dY) < 8){
-            if(board_[x+dX][y+dY].getPieceType() == KNIGHT){
-                if(!isOwn(x+dX,y+dY,color)){
-                    return true;
+            if(board[x+dX][y+dY].getPieceType() == KNIGHT){
+                if(!isOwnFunction(board,x+dX,y+dY,color)){
+                    moves.push_back(Move(x+dX,y+dY,x,y,EMPTY));
+                    if(stopForOne){
+                        return;
+                    }
                 }
             }
         }
@@ -754,7 +733,71 @@ bool Board::isChecked(int8_t x, int8_t y, int8_t color){
         }
     }
 
-    return false;
+    for(int8_t i=0; i<4; i++){
+        int8_t targetX, targetY;
+        int8_t xDir = (i%2)*2-1; //-1 1 -1 1
+        int8_t yDir = (i<2)*2-1; //1 1 -1 -1
+        targetX = x+xDir;
+        targetY = y+yDir;
+        while(max(targetX,targetY)<8 && min(targetX,targetY) >= 0){
+            if( (board[targetX][targetY].getPieceType() != EMPTY) && (board[targetX][targetY].getPieceType() != EN_PASSANT_PAWN)){
+                if(!isOwnFunction(board,targetX, targetY,color)){
+                    if(board[targetX][targetY].getPieceType() == QUEEN || board[targetX][targetY].getPieceType() == BISHOP){
+                        moves.push_back(Move(targetX,targetY,x,y,EMPTY));
+                        if(stopForOne){
+                            return;
+                        }
+                    }
+                    if(board[targetX][targetY].getPieceType() == KING && max(abs(targetX-x), abs(targetY-y)) == 1){
+                        moves.push_back(Move(targetX,targetY,x,y,EMPTY));
+                        if(stopForOne){
+                            return;
+                        }
+                    }
+                    int8_t dir = ((int8_t)((!color)*2))-1;         //-1 or 1 depending on color. The direction of opponent pawn movement
+                    if(board[targetX][targetY].getPieceType() == PAWN && (targetX+dir == x)){
+                        moves.push_back(Move(targetX,targetY,x,y,EMPTY));
+                        if(stopForOne){
+                            return;
+                        }
+                    }
+                }
+                break;
+            }
+            targetX+=xDir;
+            targetY+=yDir;
+        }
+    }
+
+    for(int8_t i=0; i<4; i++){
+        int8_t targetX, targetY;
+        int8_t* movingAxis = &targetX;
+        if(i >= 2){
+            movingAxis  = &targetY;
+        }
+        int8_t dir = (i%2)*2-1; //-1 or 1
+        targetX = x;
+        targetY = y;
+        for(*movingAxis +=dir; max(targetX,targetY)<8 && min(targetX,targetY) >= 0; *movingAxis += dir){
+            if( (board[targetX][targetY].getPieceType() != EMPTY) && (board[targetX][targetY].getPieceType() != EN_PASSANT_PAWN)){
+                if(!isOwnFunction(board,targetX, targetY,color)){
+                    if(board[targetX][targetY].getPieceType() == QUEEN || board[targetX][targetY].getPieceType() == ROOK){
+                        moves.push_back(Move(targetX,targetY,x,y,EMPTY));
+                        if(stopForOne){
+                            return;
+                        }
+                    }
+                    if(board[targetX][targetY].getPieceType() == KING && max(abs(targetX-x), abs(targetY-y)) == 1){
+                        moves.push_back(Move(targetX,targetY,x,y,EMPTY));
+                        if(stopForOne){
+                            return;
+                        }
+                    }
+                }
+                break;
+            }
+        }
+    }
 }
 
 
@@ -889,6 +932,105 @@ moveBackupData Board::makeAMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t t
 
     hasher.makeAMove(moveBackup);
     return moveBackup;
+}
+
+moveBackupData Board::makeAMoveLight(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY, int8_t promotionTo)
+{
+    moveBackupData moveBackup;
+    moveBackup.move = Move(fromX,fromY,toX,toY,promotionTo);
+
+    int8_t color = board_[fromX][fromY].color();
+
+    //check for enpassant capture
+    bool enPassantCaptured = false;
+    if((board_[toX][toY].getPieceType() == EN_PASSANT_PAWN) && (board_[fromX][fromY].getPieceType() == PAWN)){
+        enPassantCaptured = true;
+    }
+
+    bool castling = false;
+    if(board_[fromX][fromY].getPieceType() == KING){
+        if(abs(fromY-toY)>1){
+            castling = true;
+        }
+    }
+
+    //make the move
+    moveBackup.capturedPiece = board_[toX][toY];
+    board_[toX][toY] = board_[fromX][fromY];
+    board_[fromX][fromY].setPiece(EMPTY);
+
+    //remove pawn if enpassant captured
+    if(enPassantCaptured){
+        board_[fromX][toY].setPiece(EMPTY);  //enemy's pawn eaten at this address ("en passant" -rule)
+    }
+
+    //move rook if castling
+    if(castling){
+        int8_t rookFromY;
+        int8_t rookToY;
+        if(toY > fromY){
+            //kingside castling
+            rookFromY = 7;
+            rookToY = 5;
+        }
+        else{
+            //queenside
+            rookFromY = 0;
+            rookToY = 3;
+        }
+        board_[fromX][rookToY] = board_[fromX][rookFromY];
+        board_[fromX][rookFromY].setPiece(EMPTY);
+    }
+
+    //promotion
+    if(promotionTo != EMPTY){
+        board_[toX][toY].setPiece(promotionTo,color);
+    }
+
+    return moveBackup;
+}
+
+void Board::reverseAMoveLight(moveBackupData& move)
+{
+    int8_t color = board_[move.move.to.x()][move.move.to.y()].color();
+
+    //restore promotion
+    if(move.move.promotionTo_ != EMPTY){
+        board_[move.move.to.x()][move.move.to.y()].setPiece(PAWN,color);
+    }
+
+    bool enPassantCaptured = false;
+    //restore removed pawn in case of en_passant capture
+    if( (board_[move.move.to.x()][move.move.to.y()].getPieceType() == PAWN) && (move.capturedPiece.getPieceType() == EN_PASSANT_PAWN)){
+        enPassantCaptured = true;
+        board_[move.move.from.x()][move.move.to.y()].setPiece(PAWN,!color);
+    }
+
+    //restore rook position if castling was done
+    if(board_[move.move.to.x()][move.move.to.y()].getPieceType() == KING && (abs(move.move.from.y() - move.move.to.y()) > 1)){
+        int8_t rookFromY;
+        int8_t rookToY;
+        if(move.move.to.y() > move.move.from.y()){
+            //kingside castling
+            rookFromY = 7;
+            rookToY = 5;
+        }
+        else{
+            //queenside
+            rookFromY = 0;
+            rookToY = 3;
+        }
+        board_[move.move.from.x()][rookFromY] = board_[move.move.from.x()][rookToY];
+        board_[move.move.from.x()][rookToY].setPiece(EMPTY);
+    }
+
+
+    //undo move
+    board_[move.move.from.x()][move.move.from.y()] = board_[move.move.to.x()][move.move.to.y()];
+    board_[move.move.to.x()][move.move.to.y()].setPiece(EMPTY);
+    if(move.capturedPiece.getPieceType() != EMPTY){
+        board_[move.move.to.x()][move.move.to.y()] = move.capturedPiece;
+    }
 }
 
 void Board::reverseAMove(moveBackupData& move)

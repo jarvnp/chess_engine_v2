@@ -15,19 +15,10 @@
 #define KING 6
 #define EN_PASSANT_PAWN 7     //I will implement en passant with a "ghost" pawn that can be eaten with a pawn and exists for one turn only
 
-
-#define DIFFERENCE_BETWEEN_COLORS 10   //white pawn is 1, black is 10+1 = 11 and so on
+#define DIFFERENCE_BETWEEN_COLORS 8   //white pawn is 1, black is 8+1 = 9 and so on
 
 #define KING_INDEX 15           //where king is found in pieces_-array
 #define EN_PASSANT_INDEX 16
-
-
-
-
-
-
-
-
 
 class Piece
 {
@@ -37,7 +28,7 @@ public:
     Piece();
 
 
-    bool color();
+    int8_t color();
     void setPiece(int8_t piece, int8_t color = 0);      //if parameter color not given, then piece_ is set to piece
     void setPieceIndex(int8_t pieceIndex);
     int8_t getPiece();

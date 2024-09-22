@@ -12,7 +12,7 @@ Piece::Piece(Piece &piece)
 Piece::Piece(){}
 
 
-bool Piece::color()
+int8_t Piece::color()
 {
     return piece_/DIFFERENCE_BETWEEN_COLORS;
 }

@@ -19,7 +19,7 @@ public:
     uint64_t hash;
 
 private:
-    std::unordered_map<int8_t,std::unordered_map<BoardPoint,uint64_t>> pieceHashes;
+    uint64_t pieceHashes[18][64];
     uint64_t castlingHashes[CASTLING_HASHES_N];
     uint64_t blackMoveHash;
 };

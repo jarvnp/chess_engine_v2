@@ -17,8 +17,8 @@ Hasher::Hasher(){
             BoardPoint point;
             point = {i,j};
             for(int8_t piece : pieces){
-                this->pieceHashes[piece][point] = ((uint64_t)rand()) | ((uint64_t)rand() << 32);
-                this->pieceHashes[piece + DIFFERENCE_BETWEEN_COLORS][point] = ((uint64_t)rand()) | ((uint64_t)rand() << 32);
+                this->pieceHashes[piece][point.getRaw()] = ((uint64_t)rand()) | ((uint64_t)rand() << 32);
+                this->pieceHashes[piece + DIFFERENCE_BETWEEN_COLORS][point.getRaw()] = ((uint64_t)rand()) | ((uint64_t)rand() << 32);
             } 
         }
     }
@@ -41,12 +41,12 @@ void Hasher::makeAMove(moveBackupData& move){
         int8_t dir = movedColor*2-1;     //-1 or 1, depending on color
         BoardPoint point;
         point = {move.move.to.x() - dir,move.move.to.y()};
-        hash ^= pieceHashes[EN_PASSANT_PAWN + colorOffset][point];
+        hash ^= pieceHashes[EN_PASSANT_PAWN + colorOffset][point.getRaw()];
     }
 
     //remove old enpassant
     if(move.removedEnPassant.isNotOnBoard() == false){
-        hash ^= pieceHashes[EN_PASSANT_PAWN + opponentColorOffset][move.removedEnPassant];
+        hash ^= pieceHashes[EN_PASSANT_PAWN + opponentColorOffset][move.removedEnPassant.getRaw()];
     }
 
     //udpate castling info
@@ -67,8 +67,8 @@ void Hasher::makeAMove(moveBackupData& move){
             rookFrom = {move.move.from.x(),0};
             rookTo = {move.move.from.x(),3};
         }
-        hash ^= pieceHashes[ROOK + colorOffset][rookFrom];
-        hash ^= pieceHashes[ROOK + colorOffset][rookTo];
+        hash ^= pieceHashes[ROOK + colorOffset][rookFrom.getRaw()];
+        hash ^= pieceHashes[ROOK + colorOffset][rookTo.getRaw()];
     }
 
     //put moved piece to its end location
@@ -76,10 +76,10 @@ void Hasher::makeAMove(moveBackupData& move){
     if(move.move.promotionTo_ != EMPTY){
         finalPiece.setPiece(move.move.promotionTo_,movedColor);
     }
-    hash ^= pieceHashes[finalPiece.getPiece()][move.move.to];
+    hash ^= pieceHashes[finalPiece.getPiece()][move.move.to.getRaw()];
 
     //Remove moved piece from its start location
-    hash ^= pieceHashes[move.movedPiece.getPiece()][move.move.from];
+    hash ^= pieceHashes[move.movedPiece.getPiece()][move.move.from.getRaw()];
 
     bool enPassantCaptured = false;
     //removed pawn in case of en_passant capture
@@ -87,12 +87,12 @@ void Hasher::makeAMove(moveBackupData& move){
         enPassantCaptured = true;
         BoardPoint point;
         point = {move.move.from.x(),move.move.to.y()};
-        hash ^= pieceHashes[PAWN + opponentColorOffset][point];
+        hash ^= pieceHashes[PAWN + opponentColorOffset][point.getRaw()];
     }
 
     // Remove captured piece
     if(move.capturedPiece.getPieceType() != EMPTY){
-        hash ^= pieceHashes[move.capturedPiece.getPiece()][move.move.to];
+        hash ^= pieceHashes[move.capturedPiece.getPiece()][move.move.to.getRaw()];
     }
 
     move.hashChange = hash ^ origHash;

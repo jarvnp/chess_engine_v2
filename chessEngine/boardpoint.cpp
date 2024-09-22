@@ -7,12 +7,12 @@ BoardPoint::BoardPoint()
 
 int8_t BoardPoint::x()const
 {
-    return point_/8;
+    return point_ & 0b00000111;
 }
 
 int8_t BoardPoint::y()const
 {
-    return point_%8;
+    return (point_&0b00111000) >> 3;
 }
 
 bool BoardPoint::isNotOnBoard()
@@ -25,11 +25,13 @@ void BoardPoint::setNotOnBoard()
     point_ = NOT_ON_BOARD_PIECE_LOCATION;
 }
 
-
+int8_t BoardPoint::getRaw(){
+    return point_;
+}
 
 BoardPoint &BoardPoint::operator=(const std::pair<int8_t, int8_t> coordinates)
 {
-    point_ = coordinates.first*8+coordinates.second;
+    point_ = coordinates.first | (coordinates.second<<3);
     return *this;
 }
 

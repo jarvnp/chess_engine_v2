@@ -88,9 +88,13 @@ private:
     //Explanation for parameter "color": if color = WHITE, then we check if any black piece can move to this position
     bool isChecked(int8_t x, int8_t y, int8_t color);
 
-    //assumes that the move is legal, however checktest can be done after the move has been done
-    //For example the program does this: makeAMove(...) --> check if king is under threat --> true --> move was illegal --> reverseAMove(...)
+    //assumes that the move is legal
     moveBackupData makeAMove(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY,int8_t promotionTo = EMPTY);
+
+    // Use this for the checktest
+    moveBackupData makeAMoveLight(int8_t fromX, int8_t fromY, int8_t toX, int8_t toY,int8_t promotionTo = EMPTY);
+
+    void reverseAMoveLight(moveBackupData& move);
 
     //reverses a made move
     void reverseAMove(moveBackupData& move);
@@ -123,5 +127,9 @@ private:
     bool isBetterOrEqScore(int16_t a, int16_t b, int8_t color);
 
 };
+
+bool isOwnFunction(Piece board[8][8], int8_t x, int8_t y, int8_t color);
+void findThreats(Piece board[8][8], vector<Move>& moves,int8_t x, int8_t y);
+void findThreats(Piece board[8][8],vector<Move>& moves,int8_t x, int8_t y, int8_t color, bool stopForOne);
 
 #endif // BOARD_H

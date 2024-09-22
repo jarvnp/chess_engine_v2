@@ -25,6 +25,8 @@ public:
 
     bool operator== (const BoardPoint& a)const;
 
+    int8_t getRaw();
+
     friend std::hash<BoardPoint>;
 private:
     int8_t point_;
