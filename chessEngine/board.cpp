@@ -166,16 +166,26 @@ int16_t Board::searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPos
     shuffle(indeces, indeces+16,std::default_random_engine(cache->seed_));
 
     //TODO set a flag when these are fetched
-    if(!movesMade.empty()){
+    /*if(!movesMade.empty()){
         Move lastMove = movesMade.back();
         if(cache->moves_.empty()){
-            vector<Move> moves;
-            findThreats(board_,moves,lastMove.to.x(),lastMove.to.y());
-            for(auto move : moves){
-                cache->moves_.push_back(CachedMove(move,boardscore_));
-            }
+            for(int i=0; i<N_PIECES; i++){
+                vector<Move> moves;
+                if(!pieceLocations_[!turn_][i].isNotOnBoard()){
+                    findThreats(board_,moves,pieceLocations_[!turn_][i].x(),pieceLocations_[!turn_][i].y());
+                    for(auto move : moves){
+                        int8_t gain = PIECE_VALUES[board_[move.to.x()][move.to.y()].getPieceType()-1] - PIECE_VALUES[board_[move.from.x()][move.from.y()].getPieceType()-1];
+                        if(turn_ == BLACK){
+                            gain *=-1;
+                        }
+                        gain/=4;
+                        cache->moves_.push_back(CachedMove(move,boardscore_+gain));
+                    }
+                }
+            } 
+            cache->refreshOrder(); 
         }
-    }
+    }*/
 
     do{
         if( (!cache->isAllMovesFetched()) && (index >= cache->moves_.size())){
@@ -183,9 +193,9 @@ int16_t Board::searchForMove(int8_t depth,int16_t alpha, int16_t beta, CachedPos
             findLegalMovesForIndex(moves, indeces[cache->fetchedLegalMovesIndex_]);
             cache->fetchedLegalMovesIndex_++;
             for(auto move : moves){
-                if(!(!movesMade.empty() && move.to == movesMade.back().to)){  // These have been fetched already above
+                //if(!(!movesMade.empty() && move.to == movesMade.back().to)){  // These have been fetched already above
                     cache->moves_.push_back(CachedMove(move,boardscore_));
-                } 
+                //} 
             }
         }
 
